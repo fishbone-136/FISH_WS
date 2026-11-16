@@ -1,0 +1,12 @@
+<library path="go2_stable_rotation_shim">
+  <class name="go2_navigation::StableRotationShim"
+         type="go2_navigation::StableRotationShim"
+         base_class_type="nav2_core::Controller">
+    <description>Go2 heading alignment with fresh latest TF and stable rear turns.</description>
+  </class>
+  <class name="go2_navigation::StableGoalChecker"
+         type="go2_navigation::StableGoalChecker"
+         base_class_type="nav2_core::GoalChecker">
+    <description>Geometric-goal XY capture with bounded hysteresis across replans.</description>
+  </class>
+</library>

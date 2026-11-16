@@ -1,0 +1,58 @@
+scan_context_loop_closure:
+  ros__parameters:
+    # Only consume odometry that passed the jump/staleness guard. A divergent
+    # FAST-LIO sample must never become a permanent pose-graph keyframe.
+    odom_topic: /Odometry_validated
+    cloud_topic: /cloud_registered_body
+    map_frame: map
+    odom_frame: odom_lio
+    keyframe_distance: 0.50
+    keyframe_angle_deg: 15.0
+    # Negative disables time-only keyframes: a stationary robot must not grow
+    # the pose graph or repeatedly attempt self-loop closures.
+    keyframe_time: -1.0
+    # 30 cm left only 50-87 points in the later HAP keyframes, so no loop
+    # candidate could even be evaluated. 20 cm remains inexpensive for GICP.
+    voxel_leaf_size: 0.20
+    descriptor_rings: 20
+    descriptor_sectors: 60
+    descriptor_max_radius: 35.0
+    descriptor_height_offset: 2.0
+    descriptor_distance_threshold: 0.22
+    # A tiny common angular sliver must not pass as a full HAP revisit.
+    descriptor_min_overlap: 0.65
+    descriptor_min_sectors: 6
+    descriptor_candidate_count: 10
+    max_registration_candidates: 3
+    # Short indoor tests return to the same place well before 35 keyframes.
+    # GICP and bounded corrections remain the final false-positive checks.
+    recent_keyframe_exclusion: 12
+    loop_keyframe_cooldown: 3
+    min_loop_time: 10.0
+    min_loop_travel: 2.0
+    loop_search_radius: 5.0
+    submap_half_window: 6
+    source_submap_keyframes: 3
+    gicp_max_correspondence_distance: 1.50
+    gicp_max_iterations: 40
+    # Fitness is squared metres: 0.35 previously admitted ~59 cm RMS error.
+    # Evaluate explicit 30 cm inliers and their coverage, rather than PCL's
+    # permissive nearest-neighbor fitness over an unspecified overlap.
+    gicp_fitness_threshold: 0.01
+    gicp_inlier_distance: 0.30
+    gicp_min_overlap: 0.70
+    gicp_min_inliers: 200
+    gicp_min_normal_eigenvalue_ratio: 0.01
+    max_loop_translation_correction: 0.25
+    max_loop_rotation_correction_deg: 12.0
+    max_loop_vertical_correction: 0.10
+    max_loop_tilt_correction_deg: 2.0
+    odom_rotation_sigma: 0.03
+    odom_translation_sigma: 0.08
+    loop_rotation_sigma: 0.04
+    loop_translation_sigma: 0.20
+    # Publish recognisable environment geometry after about every metre of
+    # travel, instead of keeping only the first tiny map until 20 keyframes.
+    global_map_leaf_size: 0.15
+    global_map_publish_every_n_keyframes: 2
+    max_global_map_keyframes: 400

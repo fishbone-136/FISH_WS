@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "transform": "optical_to_parent",
+  "parent_frame": "livox_frame",
+  "optical_frames": ["camera_color_optical_frame", "d435i_color_optical_frame"],
+  "translation_xyz": [0.0167837923, 0.0334362214, 0.0536769314],
+  "quaternion_xyzw": [-0.4931670272, 0.5002128775, -0.5009305427, 0.5056104743],
+  "parent_in_body": {
+    "frame": "base_link",
+    "translation_xyz": [0.14, 0.0, 0.13],
+    "quaternion_xyzw": [0.0, 0.0, 0.0, 1.0],
+    "source_file": "/home/fishbone/GO2/go2_ws/src/go2_nav_description/config/sensor_frames.yaml",
+    "source_sha256": "2ba91bf75c0be22226c712ca649875f419a7356a9d85fd2672f8a74fe4639fe0"
+  },
+  "source": {
+    "method": "direct_visual_lidar_calibration",
+    "file": "/home/fishbone/GO2/go2_ws/src/go2_nav_description/config/hap_d435i_calibration.yaml",
+    "sha256": "e4290002aae83b8f02dd3bb980aaa6976fa2b70c49ac1880fae74d921d8463fd"
+  }
+}

@@ -1,0 +1,28 @@
+/* Presentation for the embedded map only. */
+QWidget {
+    background-color: #080C14;
+    color: #C8E8FF;
+    font-family: "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+    font-size: 13px;
+}
+QMainWindow { background-color: #080C14; }
+QMenuBar, QStatusBar { min-height: 0px; max-height: 0px; padding: 0px; border: none; }
+QToolBar {
+    background-color: #0C1E3A;
+    border: none;
+    border-bottom: 1px solid #1A5080;
+    spacing: 5px;
+    padding: 4px;
+}
+QToolButton {
+    color: #C8E8FF;
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 5px 8px;
+}
+QToolButton:hover { background-color: #143654; border-color: #278BA0; }
+QToolButton:checked { color: #00F0FF; background-color: #12384A; border-color: #00A8C0; }
+QMenu { background-color: #0C1E3A; border: 1px solid #1A5080; }
+QMenu::item:selected { background-color: #143654; color: #00F0FF; }
+QToolTip { color: #C8E8FF; background-color: #0C1E3A; border: 1px solid #1A5080; padding: 5px; }

@@ -1,0 +1,37 @@
+from launch import LaunchDescription
+from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.substitutions import LaunchConfiguration
+from ament_index_python.packages import get_package_share_directory
+import os
+
+
+def generate_launch_description():
+    # 获取slam_toolbox包的路径
+    slam_toolbox_dir = get_package_share_directory('slam_toolbox')
+
+    # 设置配置文件路径
+    slam_toolbox_config = os.path.join(
+        get_package_share_directory('go2_slam'),
+        'config',
+        'mapper_params_online_async.yaml'
+    )
+
+    # 包含slam_toolbox的launch文件
+    slam_toolbox_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource([
+            os.path.join(slam_toolbox_dir, 'launch', 'online_async_launch.py')
+        ]),
+        launch_arguments={
+            # Humble 的 slam_toolbox launch 参数名是 slam_params_file；传成
+            # params_file 会被静默忽略，并回退到 base_footprint 等默认值。
+            'slam_params_file': LaunchConfiguration('params_file'),
+            'use_sim_time': LaunchConfiguration('use_sim_time'),
+        }.items(),
+    )
+
+    return LaunchDescription([
+        DeclareLaunchArgument('use_sim_time', default_value='false'),
+        DeclareLaunchArgument('params_file', default_value=slam_toolbox_config),
+        slam_toolbox_launch
+    ])

@@ -1,0 +1,4 @@
+# 兼容旧安装方式；新环境请优先运行 scripts/install_interaction_dependencies.sh，
+# 以保留系统 OpenCV 的 GStreamer 支持。
+mediapipe>=0.10,<0.11
+pyrealsense2>=2.54,<3

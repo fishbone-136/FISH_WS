@@ -1,0 +1,97 @@
+slam_toolbox:
+  ros__parameters:
+
+    # Plugin params
+    solver_plugin: solver_plugins::CeresSolver
+    ceres_linear_solver: SPARSE_NORMAL_CHOLESKY
+    ceres_preconditioner: SCHUR_JACOBI
+    ceres_trust_strategy: LEVENBERG_MARQUARDT
+    ceres_dogleg_type: TRADITIONAL_DOGLEG
+    # Huber 对偶发动态障碍/离群扫描更鲁棒，减少墙面重影。
+    ceres_loss_function: HuberLoss
+
+    # ROS Parameters
+    odom_frame: odom
+    map_frame: map
+    base_frame: base_link
+    scan_topic: /scan
+    mode: mapping 
+
+    debug_logging: false
+    # 接收每一帧 HAP 激光扫描；扫描匹配与地图发布解耦。
+    throttle_scans: 1
+    transform_publish_period: 0.05
+    # 扫描匹配跟随 HAP 的有效扫描输入；全图以 4 Hz 发布，在 AGX Orin 上
+    # 能明显改善 UI/静态层刷新，同时避免无上限刷新抢占匹配线程导致漂移。
+    map_update_interval: 0.25
+    resolution: 0.04
+    min_laser_range: 0.25
+    # 室内远点会按距离成比例放大很小的航向误差；8 m 已覆盖局部结构，
+    # 同时显著降低原地转向时远端墙面摆动对匹配结果的影响。
+    max_laser_range: 8.0
+    
+    # HAP 完整栈实测约 4-7 Hz；允许 scan matcher 消费每个新扫描。
+    # async 队列仍只保留最新一帧，CPU 忙时不会追赶历史数据。
+    minimum_time_interval: 0.05
+    transform_timeout: 0.20
+    # 使用发布时刻更新 map->odom，避免 Nav2 查询当前位姿时出现十几毫秒的未来外推。
+    restamp_tf: true
+    tf_buffer_duration: 10.0
+    stack_size_to_use: 40000000 
+    enable_interactive_mode: false
+    # async 模式只保留最新扫描，避免 CPU 忙时处理过期数据。
+    scan_queue_size: 1
+
+    # General Parameters
+    use_scan_matching: true
+    use_scan_barycenter: true
+    
+    # 移动/旋转更新阈值，平衡雷达与里程计
+    minimum_travel_distance: 0.05
+    minimum_travel_heading: 0.05
+    
+    scan_buffer_size: 10
+    scan_buffer_maximum_scan_distance: 10.0
+    
+    # 普通匹配阈值：过滤噪点，防止日常漂移
+    link_match_minimum_response_fine: 0.50
+    
+    link_scan_maximum_distance: 1.5
+    loop_search_maximum_distance: 3.0
+    do_loop_closing: true 
+    
+    loop_match_minimum_chain_size: 12
+    loop_match_maximum_variance_coarse: 3.0  
+    
+    # 回环必须由连续扫描链共同确认，并使用中等响应阈值；这仍允许第二圈闭环，
+    # 同时避免动态物体或相似走廊触发错误回环后把整张地图突然拉歪。
+    loop_match_minimum_response_coarse: 0.45
+    loop_match_minimum_response_fine: 0.55
+
+    # Correlation Parameters
+    correlation_search_space_dimension: 0.5
+    correlation_search_space_resolution: 0.01
+    correlation_search_space_smear_deviation: 0.1 
+
+    # Loop Closure Parameters
+    # Karto 要求 dimension / resolution 为偶整数。原来的 8.0 / 0.03
+    # 不可整除，触发回环时可能越界并抛出 probability search 致命错误。
+    # 6.0 / 0.05 = 120，覆盖 3 m 候选半径且计算量约降至原来的 1/5。
+    loop_search_space_dimension: 6.0
+    loop_search_space_resolution: 0.05
+    loop_search_space_smear_deviation: 0.03
+
+    # Scan Matcher Parameters
+    distance_variance_penalty: 0.5      
+    angle_variance_penalty: 1.0    
+
+    fine_search_angle_offset: 0.00349     
+    coarse_search_angle_offset: 0.349   
+    coarse_angle_resolution: 0.0349        
+    minimum_angle_penalty: 0.9
+    minimum_distance_penalty: 0.5
+    use_response_expansion: true
+    # 单帧角度连续化后真实表面已经更稳定；两次一致观测即可入图，避免
+    # 低矮/斜面障碍因扫描落点轻微变化只剩一个孤立栅格。
+    min_pass_through: 2
+    occupancy_threshold: 0.2

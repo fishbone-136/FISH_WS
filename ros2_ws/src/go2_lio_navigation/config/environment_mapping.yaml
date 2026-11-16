@@ -1,0 +1,27 @@
+environment_mapper:
+  ros__parameters:
+    map_frame: map
+    odom_frame: odom_lio
+    # Persistent reference mapping is independent of the 8 Hz live Nav2 layer.
+    # Rebuild corrected geometry only when keyframes or graph poses change.
+    # 333 ms updates keep the growing map responsive without rebuilding the
+    # complete history at the 8 Hz local-controller frequency.
+    update_rate: 3.0
+    # Walls/furniture are a reference view, not the immediate obstacle sensor.
+    # Avoid sorting and serializing the full historical cloud every terrain tick.
+    cloud_publish_rate: 1.0
+    resolution: 0.15
+    keyframe_voxel_size: 0.10
+    mapping_range: 8.0
+    min_sensor_height: -1.40
+    max_sensor_height: 1.50
+    max_keyframes: 400
+    max_map_extent: 60.0
+    min_points_per_cell: 2
+    max_preview_age: 0.8
+    # Keep dense, individually corrected keyframes. A coarse aggregate has no
+    # observation identity and can reinsert a removed passer-by on every graph
+    # update. Enable only for viewing an old graph after starting this node late.
+    use_pose_graph_fallback: false
+    # Empty selects $GO2_HUMBLE_PROJECT_ROOT/maps, with a unique session folder.
+    output_directory: ""

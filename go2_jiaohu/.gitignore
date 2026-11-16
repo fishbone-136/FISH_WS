@@ -1,0 +1,8 @@
+__pycache__/
+.env
+.venv/
+*.pyc
+*.pyc
+.vscode/
+voice/models/
+third_party/

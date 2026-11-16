@@ -1,0 +1,21 @@
+<!-- MPPI variant of the online-navigation tree. -->
+<root main_tree_to_execute="MainTree">
+  <BehaviorTree ID="MainTree">
+    <RecoveryNode number_of_retries="2" name="NavigateRecovery">
+      <PipelineSequence name="NavigateWithReplanning">
+        <RateController hz="2.0">
+          <Sequence>
+            <LatestGoalPose input="{goal}" output="{planning_goal}"/>
+            <ComputePathToPose server_timeout="1000" goal="{planning_goal}" path="{path}" planner_id="GridBased"/>
+          </Sequence>
+        </RateController>
+        <FollowPath server_timeout="1000" path="{path}" controller_id="FollowPathMPPI" goal_checker_id="goal_checker"/>
+      </PipelineSequence>
+      <ReactiveFallback name="RecoveryFallback">
+        <GoalUpdated/>
+        <!-- Humble stores wait duration in integer seconds; 0.25 became zero. -->
+        <Wait wait_duration="1"/>
+      </ReactiveFallback>
+    </RecoveryNode>
+  </BehaviorTree>
+</root>
