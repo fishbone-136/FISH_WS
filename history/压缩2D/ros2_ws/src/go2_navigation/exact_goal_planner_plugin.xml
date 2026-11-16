@@ -1,0 +1,7 @@
+<library path="go2_exact_goal_smac">
+  <class name="go2_navigation::ExactGoalSmac2D"
+         type="go2_navigation::ExactGoalSmac2D"
+         base_class_type="nav2_core::GlobalPlanner">
+    <description>Smac2D route ending at the exact requested point in its checked goal cell.</description>
+  </class>
+</library>

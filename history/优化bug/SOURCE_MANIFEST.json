@@ -1,0 +1,3344 @@
+{
+  "version": "优化bug",
+  "source": "历史版本/优化bug",
+  "file_count": 667,
+  "total_bytes": 5557176,
+  "omitted_files_at_least_1_MiB": [],
+  "files": {
+    ".gitignore": {
+      "sha256": "f64809c1269b426a22fb52f605075f31df48f98c72c65cfdfdc22e1a9a626dde",
+      "bytes": 1503,
+      "mode": "644"
+    },
+    "Go2_Humble_使用教程.md": {
+      "sha256": "febfb6351d36b1dc7475907f6e675690c7f5ea6d1fa1e2a169a0aede75204c68",
+      "bytes": 18428,
+      "mode": "644"
+    },
+    "README.md": {
+      "sha256": "f10ecb2372325116302c8f777a396d5a2f362f59a09351861e561f9afa312659",
+      "bytes": 3416,
+      "mode": "644"
+    },
+    "SNAPSHOT.md": {
+      "sha256": "161a5131f0e043a5d2d167b79d6d63eaae313db82fee15650615dededed99f61",
+      "bytes": 1014,
+      "mode": "644"
+    },
+    "config/99-go2-lidar-buffers.conf": {
+      "sha256": "a6124f497aee1b8e5c5bdd8ace695b88e411129accecf4c0db3e2b92f597b4df",
+      "bytes": 206,
+      "mode": "644"
+    },
+    "go2_jiaohu/.env.example": {
+      "sha256": "2f32d03e83c7d6629b1a36e4562aa85504b49377f5583e6f47964be00c9b1297",
+      "bytes": 3439,
+      "mode": "644"
+    },
+    "go2_jiaohu/README.md": {
+      "sha256": "18c55a7b2a1702c2f5bc154b33546f1cf53ad2443d3edf94e8572bbca9feee61",
+      "bytes": 13714,
+      "mode": "644"
+    },
+    "go2_jiaohu/config/alsa-pulse.conf": {
+      "sha256": "26050790b2fc877544e47a32addca4bc0a4f47ae4051c1199f0393664e150930",
+      "bytes": 899,
+      "mode": "644"
+    },
+    "go2_jiaohu/deploy/__init__.py": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "mode": "644"
+    },
+    "go2_jiaohu/deploy/gesture_controller.py": {
+      "sha256": "7ef06752ecee27166c0435e5a109ec32c52e96e3df642cfa1e1831525fadd476",
+      "bytes": 2808,
+      "mode": "644"
+    },
+    "go2_jiaohu/deploy/speech_controller.py": {
+      "sha256": "266662379b8db213a6933d198b84ccb6501861e41c36d6f7734e97fd63ac10b0",
+      "bytes": 7456,
+      "mode": "644"
+    },
+    "go2_jiaohu/deploy/vlm_controller.py": {
+      "sha256": "c90b1714aca6edceb17e2f992c74e7137a6c0bfe9341c3fa9379c5df3244f252",
+      "bytes": 441,
+      "mode": "644"
+    },
+    "go2_jiaohu/go2_ui/activity_manager.py": {
+      "sha256": "d4781180de5576e7ac8762359bb9c73126bbc763abff5285993b4d6a510a9fc0",
+      "bytes": 2904,
+      "mode": "644"
+    },
+    "go2_jiaohu/go2_ui/navigation/__init__.py": {
+      "sha256": "2a7cb422c4dc1c8e236f74af94e543068e77f33bc8b176592ffd650c156c7859",
+      "bytes": 73,
+      "mode": "644"
+    },
+    "go2_jiaohu/go2_ui/navigation/navigation_page.py": {
+      "sha256": "de0ff792dbba5fc2dea362582f7dc0e88cf99ac172651a7ec9277649af8ce644",
+      "bytes": 22486,
+      "mode": "644"
+    },
+    "go2_jiaohu/go2_ui/navigation/ros_bridge.py": {
+      "sha256": "cafd2bd0dab88316be1a6d3ba66c0644f510f8cd4d6d8f0bcc0ff5abdd533877",
+      "bytes": 19810,
+      "mode": "644"
+    },
+    "go2_jiaohu/go2_ui/resources/icons/bt.svg": {
+      "sha256": "ac29a8fe67ff37f67f5d33dd28daf13dd66061b95b8b4226f22fe13963dd8a49",
+      "bytes": 706,
+      "mode": "644"
+    },
+    "go2_jiaohu/go2_ui/resources/icons/chuangan.svg": {
+      "sha256": "53ee5d2c47c796ebe147c5f31f06fc5784c6459e427b6f2a4f0cf321766a3719",
+      "bytes": 1195,
+      "mode": "644"
+    },
+    "go2_jiaohu/go2_ui/resources/icons/close.svg": {
+      "sha256": "b7dc1124beefa52c390f19833ae3abb893c71e0ee44a5f03a6f5e90fb3625d9c",
+      "bytes": 1128,
+      "mode": "644"
+    },
+    "go2_jiaohu/go2_ui/resources/icons/daoh.svg": {
+      "sha256": "ea019fee6e0cab5f4562606e143c42fc7c05896aa89f3d99806857a79a0acf06",
+      "bytes": 1914,
+      "mode": "644"
+    },
+    "go2_jiaohu/go2_ui/resources/icons/eye.svg": {
+      "sha256": "a8b33e01f68d4c4da64c6051ec14738abc5a22f3cc9e853c55dbf9eeed90187f",
+      "bytes": 2462,
+      "mode": "644"
+    },
+    "go2_jiaohu/go2_ui/resources/icons/fuzai.svg": {
+      "sha256": "835e60aeff493443aca1fc554ecdd2a5ecbe472524323f8b883850e16134695b",
+      "bytes": 867,
+      "mode": "644"
+    },
+    "go2_jiaohu/go2_ui/resources/icons/ganzhi.svg": {
+      "sha256": "471864760803db6cd636cc2d56feebe56a46b2373ec0536c6d29189c9af929ba",
+      "bytes": 2293,
+      "mode": "644"
+    },
+    "go2_jiaohu/go2_ui/resources/icons/gesture.svg": {
+      "sha256": "e05851aa87453b31e3edf8bc604b84bf62fd2432c41d5d5132d7052d36970b90",
+      "bytes": 7230,
+      "mode": "644"
+    },
+    "go2_jiaohu/go2_ui/resources/icons/gpu.svg": {
+      "sha256": "84b1405093fce593e5423ed299cb220635547ef5c6dee4a4d2cdfd623f1c7bae",
+      "bytes": 720,
+      "mode": "644"
+    },
+    "go2_jiaohu/go2_ui/resources/icons/home.svg": {
+      "sha256": "5eb065ea5a8af92ab91ceca32169d754885e97b0e2822a9533776f7919942e55",
+      "bytes": 2625,
+      "mode": "644"
+    },
+    "go2_jiaohu/go2_ui/resources/icons/power.svg": {
+      "sha256": "1e26fa02bc527823d9bdbb6a59395da539ee75bc3e1a54596ebf45b6db79c7d0",
+      "bytes": 961,
+      "mode": "644"
+    },
+    "go2_jiaohu/go2_ui/resources/icons/renw.svg": {
+      "sha256": "bd8128cf1a19364e9141e7081220b8940f44a6995f40a7752a3ae8cbd546a3d2",
+      "bytes": 1324,
+      "mode": "644"
+    },
+    "go2_jiaohu/go2_ui/resources/icons/set.svg": {
+      "sha256": "560c634d1fff7f3bdde5fe2ecc27f33e9294379d066c76fe77bda96055c44be6",
+      "bytes": 1316,
+      "mode": "644"
+    },
+    "go2_jiaohu/go2_ui/resources/icons/vlm.svg": {
+      "sha256": "84793ca098033c607a05052df6e08471da3e26ec9aa17dc598406ac47805b9ff",
+      "bytes": 2609,
+      "mode": "644"
+    },
+    "go2_jiaohu/go2_ui/resources/icons/voice.svg": {
+      "sha256": "7dd6ecb2d707952129a049e08fce65a06791754e0510ebec898af7d45fc0d1d6",
+      "bytes": 3614,
+      "mode": "644"
+    },
+    "go2_jiaohu/go2_ui/resources/icons/wifi.svg": {
+      "sha256": "e9537741f68223f8de360df29535efc27c948580725b65f0e9b39931fb690806",
+      "bytes": 2814,
+      "mode": "644"
+    },
+    "go2_jiaohu/go2_ui/resources/icons/xiet.svg": {
+      "sha256": "b3f8fd55b7906c21b9e521fb0b119e89fb791a58894dcfdb6597b92b0c7a00ee",
+      "bytes": 1851,
+      "mode": "644"
+    },
+    "go2_jiaohu/go2_ui/resources/qss/cyber_blue.qss": {
+      "sha256": "1d8f0d562f6c4c2914cd1b7d03d79734f593c3fa135b3e1305257611a049ef6a",
+      "bytes": 4761,
+      "mode": "644"
+    },
+    "go2_jiaohu/go2_ui/runtime_logging.py": {
+      "sha256": "58d3085ad2aba103d49d34ea89e1e7ed1858538b7d5927f9abc35b779895dcc0",
+      "bytes": 1016,
+      "mode": "644"
+    },
+    "go2_jiaohu/go2_ui/ui/QStackedWidget.py": {
+      "sha256": "51182f6d4c61307985c471f1730ebaf3a93c98c60b7e1c6e93ef816b914d9cbd",
+      "bytes": 2959,
+      "mode": "644"
+    },
+    "go2_jiaohu/go2_ui/ui/bottom_nav.py": {
+      "sha256": "6a94a6cc0da79959db826bc4f28915d9406367c78f73c8d21fa3a7db27baef47",
+      "bytes": 4365,
+      "mode": "644"
+    },
+    "go2_jiaohu/go2_ui/ui/main_control_panel.py": {
+      "sha256": "1ba82e64234199121405327d124ab2e8fee402d3c47694b2ee3017201d7d169c",
+      "bytes": 61033,
+      "mode": "644"
+    },
+    "go2_jiaohu/go2_ui/ui/right_panel.py": {
+      "sha256": "d21e486ae3cca809109021fe27e610de8d25923e5accd19c78bac7e00db3f0b4",
+      "bytes": 12365,
+      "mode": "644"
+    },
+    "go2_jiaohu/go2_ui/ui/splash_screen.py": {
+      "sha256": "ed02493958ab57864a3668b11d3eef938adeafa1de663b053b98e3bf663ee6b6",
+      "bytes": 217,
+      "mode": "644"
+    },
+    "go2_jiaohu/go2_ui/ui/top_bar.py": {
+      "sha256": "742a951965495f3d67a7aba97626bfbb31731b8cb7b9a6d34a4cd74bbee3f67f",
+      "bytes": 10380,
+      "mode": "644"
+    },
+    "go2_jiaohu/go2_ui/ui/widgets/cyber_background.py": {
+      "sha256": "a6bba69d9c4329504d527e5212e42370eccaa4ec2d469ce8108df006a84465ac",
+      "bytes": 8585,
+      "mode": "644"
+    },
+    "go2_jiaohu/go2_ui/ui/widgets/neon_frame.py": {
+      "sha256": "c94c275b77b0c44c947ea7046059cada0b1f03bef355471d82d7e5734b307c49",
+      "bytes": 1409,
+      "mode": "644"
+    },
+    "go2_jiaohu/hand/__init__.py": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "mode": "644"
+    },
+    "go2_jiaohu/hand/gesture.py": {
+      "sha256": "95e19dd7b8e598c10ee8067d22c4d67b1a6202269266c551791a2a2845864133",
+      "bytes": 4850,
+      "mode": "644"
+    },
+    "go2_jiaohu/hand/hand.py": {
+      "sha256": "d0d9f82d0c66fa08f920d1a68f23502f7907027a8d26bb32310fa8a31193a1df",
+      "bytes": 14410,
+      "mode": "644"
+    },
+    "go2_jiaohu/main.py": {
+      "sha256": "4378341f2be4d61194eb898f30d73b9c466b7aa78631ef40fd01117a136b141b",
+      "bytes": 4805,
+      "mode": "644"
+    },
+    "go2_jiaohu/offline_test/__init__.py": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "mode": "644"
+    },
+    "go2_jiaohu/offline_test/camera_test.py": {
+      "sha256": "67202d07d2a9b79b73f5b12a1e674321ade5beb5a44c264448db55529f2d38c9",
+      "bytes": 5978,
+      "mode": "644"
+    },
+    "go2_jiaohu/offline_test/gesture_controller.py": {
+      "sha256": "4168dde855760e871773b12a39cfefc92e1aa0e69947eeedf26593daff3dd234",
+      "bytes": 9674,
+      "mode": "644"
+    },
+    "go2_jiaohu/offline_test/main.py": {
+      "sha256": "ed7f540ec4d230e89896883cfe3beb44c271b4e0b2e428803ca59f1ae21e704d",
+      "bytes": 5160,
+      "mode": "644"
+    },
+    "go2_jiaohu/offline_test/speech_controller.py": {
+      "sha256": "f8af258f8ee11a11957e655711a42022723f04a011d66c8bf35ff19b8403f28f",
+      "bytes": 26976,
+      "mode": "644"
+    },
+    "go2_jiaohu/offline_test/video.py": {
+      "sha256": "760f1a1afaf44b394e18a7d2bf718844ecadde243be6d3324c50b977ef748641",
+      "bytes": 1109,
+      "mode": "644"
+    },
+    "go2_jiaohu/offline_test/vlm_controller.py": {
+      "sha256": "704555affb1026f46537ba2f148737f40da2be9f34e5ce07049b17dee6638dd2",
+      "bytes": 7002,
+      "mode": "644"
+    },
+    "go2_jiaohu/requirements-optional-x86_64.txt": {
+      "sha256": "d49aa6346e34c7413fab871ee381f68b063fea2f92349419bd3eef265995faf3",
+      "bytes": 191,
+      "mode": "644"
+    },
+    "go2_jiaohu/requirements.txt": {
+      "sha256": "99933e2d56820f67af62c6cc220af8ae9f4d009e1969ef6ac24056279e856b1a",
+      "bytes": 472,
+      "mode": "644"
+    },
+    "go2_jiaohu/tests/__init__.py": {
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "bytes": 1,
+      "mode": "644"
+    },
+    "go2_jiaohu/tests/test_activity_manager.py": {
+      "sha256": "ce1b323e6d55e2b9898a5be1829683bf4f3c7614248dd01e0b8b00b06fdb3b33",
+      "bytes": 2067,
+      "mode": "644"
+    },
+    "go2_jiaohu/tests/test_asr_protocol.py": {
+      "sha256": "e8768e0f93865c7279f90a1f6eb6dbbef0107e75eb9d7f0b36e51571782014fa",
+      "bytes": 1551,
+      "mode": "644"
+    },
+    "go2_jiaohu/tests/test_asr_quality.py": {
+      "sha256": "04387218834bf72dfa15c97f0d1ddfab29321aef2b963cc62fa23fd6f426672d",
+      "bytes": 9382,
+      "mode": "644"
+    },
+    "go2_jiaohu/tests/test_command_safety.py": {
+      "sha256": "f98afe9202f96e74b3b62b36726d6f22edbf9159baf23ce90417b8718bf90a4b",
+      "bytes": 8557,
+      "mode": "644"
+    },
+    "go2_jiaohu/tests/test_dashboard_interaction.py": {
+      "sha256": "722302d4009cabcd4578d7c174435405e2170ac6bc40e53e8b74654a04c02bee",
+      "bytes": 10299,
+      "mode": "644"
+    },
+    "go2_jiaohu/tests/test_emergency_alarm.py": {
+      "sha256": "05c6a823f559b56043987fc1ed8b1bf51e82e3cfd6eac20f02f1bd946f89f294",
+      "bytes": 3079,
+      "mode": "644"
+    },
+    "go2_jiaohu/tests/test_feature_lifecycle.py": {
+      "sha256": "118a5d8ae22fee870e26d13248a7f704c2a343bca1158a93486df2b9ea61f3e5",
+      "bytes": 1414,
+      "mode": "644"
+    },
+    "go2_jiaohu/tests/test_llm_language.py": {
+      "sha256": "ec4c39f98f492452bc74c0a6c4b215610f7622a272eb126707547746ea4f558c",
+      "bytes": 3329,
+      "mode": "644"
+    },
+    "go2_jiaohu/tests/test_navigation_tuning.py": {
+      "sha256": "c4cc2230e4043a45d041b568c242ecf2ddd1512ee51e9642df8d13198eea26b4",
+      "bytes": 9371,
+      "mode": "644"
+    },
+    "go2_jiaohu/tests/test_ollama_client.py": {
+      "sha256": "52bc92eac3ab4c5c1a8dc4af20f6189e71842f8e9c4b46a68b94d61800ba51d6",
+      "bytes": 1440,
+      "mode": "644"
+    },
+    "go2_jiaohu/tests/test_scene_conversation.py": {
+      "sha256": "314d314320418759dbf8657c04ab62caee44fce2147193535ed84046bd131e09",
+      "bytes": 2523,
+      "mode": "644"
+    },
+    "go2_jiaohu/tests/test_sdk_worker.py": {
+      "sha256": "9f7ff9ab2324f5243f6279d89bd15b07654a453b04f9074ab4fc60e5310c09f0",
+      "bytes": 1741,
+      "mode": "644"
+    },
+    "go2_jiaohu/tests/test_speech_controller.py": {
+      "sha256": "a0f1e1f494af64cd6c60837632345972796126dcd5988379c82efb059a6b8bc1",
+      "bytes": 5293,
+      "mode": "644"
+    },
+    "go2_jiaohu/tests/test_speech_feedback.py": {
+      "sha256": "5968d90b780899d6ab78101760dbfb291b70ff3472fa2203497d84ea04dfd807",
+      "bytes": 3732,
+      "mode": "644"
+    },
+    "go2_jiaohu/tests/test_visual_guidance.py": {
+      "sha256": "bb8ca7bcfe1ef86f17fdd22b9f3dc0402b89d9c6945cc2fb7e3a551e39c7fd53",
+      "bytes": 1316,
+      "mode": "644"
+    },
+    "go2_jiaohu/tests/test_voice_startup.py": {
+      "sha256": "80be3a01f25dd06177e8fa7587d74f3c34f84e5534280865d5042b3ba1c8bdcb",
+      "bytes": 2535,
+      "mode": "644"
+    },
+    "go2_jiaohu/vlm/SKILL.md": {
+      "sha256": "7cb17f941c2d102e0013d8ab5445d887ed35d140562df3fa516b5776db724b09",
+      "bytes": 4621,
+      "mode": "644"
+    },
+    "go2_jiaohu/vlm/__init__.py": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "mode": "644"
+    },
+    "go2_jiaohu/vlm/go2_driver.py": {
+      "sha256": "4c9cc1adad852929fc920bf458afeda49be372e24fbbb1e14b09f40c9ce15f4a",
+      "bytes": 5754,
+      "mode": "644"
+    },
+    "go2_jiaohu/vlm/main.py": {
+      "sha256": "1c5a9d81535efc2941e5c98e73109a8ff01948bbb8be38edf6e4d2fd4cf989f1",
+      "bytes": 3641,
+      "mode": "644"
+    },
+    "go2_jiaohu/voice/__init__.py": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "mode": "644"
+    },
+    "go2_jiaohu/voice/asr_worker.py": {
+      "sha256": "ccd46ef2dcfd183e0f4b8ab90fbb815d6e286dc6d37d7e837e0732bed34e0c1f",
+      "bytes": 27739,
+      "mode": "644"
+    },
+    "go2_jiaohu/voice/audio_processor.py": {
+      "sha256": "f99a9d80f7996c8a029905efcd0138d7f2a005a42e8f9ea6cd270907a17a0f85",
+      "bytes": 6209,
+      "mode": "644"
+    },
+    "go2_jiaohu/voice/command_safety.py": {
+      "sha256": "6de623df01966369c51383657f822eb214f70e5cffcc7302a0f402b780bd3020",
+      "bytes": 24405,
+      "mode": "644"
+    },
+    "go2_jiaohu/voice/config.py": {
+      "sha256": "d9905714c404b7c79b594b5ea360beaff1189c9683f93668ee265071a37806bc",
+      "bytes": 12019,
+      "mode": "644"
+    },
+    "go2_jiaohu/voice/emergency_alarm.py": {
+      "sha256": "baf144b677ad77266c2ec87949db2b4bbc80550179749265fd3009af6b0f0c93",
+      "bytes": 4242,
+      "mode": "644"
+    },
+    "go2_jiaohu/voice/llm_processor.py": {
+      "sha256": "8a3c35e1a324af4aa73b16e9ee0ca3af9db5ebba96f1aef88547c680cf953fef",
+      "bytes": 10350,
+      "mode": "644"
+    },
+    "go2_jiaohu/voice/local_asr.py": {
+      "sha256": "a9684df341981cf3ef37cd6ab1f074ff37074d61e00802dac8fded462b6af4f7",
+      "bytes": 6268,
+      "mode": "644"
+    },
+    "go2_jiaohu/voice/local_tts.py": {
+      "sha256": "c1b70eb6cfa2eb34db416b2ea68013174c577006a293b6ce638c3ea748b6d400",
+      "bytes": 8153,
+      "mode": "644"
+    },
+    "go2_jiaohu/voice/main.py": {
+      "sha256": "70bbb28fa88aee9179f36af25c12148b9b844e92bf5396e67e134e4b598e778c",
+      "bytes": 2703,
+      "mode": "644"
+    },
+    "go2_jiaohu/voice/ollama_client.py": {
+      "sha256": "957f4ec8b2f1e65c28e9ecf568fb1b525d906ff0f4b286b6b4d8c6400f259799",
+      "bytes": 7767,
+      "mode": "644"
+    },
+    "go2_jiaohu/voice/robot_interface.py": {
+      "sha256": "816fb2a78eb44c0f03e994b469910f5d48f78c360224695db87664a79effb8c6",
+      "bytes": 14352,
+      "mode": "644"
+    },
+    "go2_jiaohu/voice/ros_command_worker.py": {
+      "sha256": "f6b5edcd9258fe8751d6277b83ddd5d55bb461ef3492914111bf8c99d37f02f9",
+      "bytes": 4217,
+      "mode": "644"
+    },
+    "go2_jiaohu/voice/sdk_worker.py": {
+      "sha256": "b914dc9e4b5e92eec4c81b13e2f030fa0d94b0001e3eede853581834ae86d1f1",
+      "bytes": 8529,
+      "mode": "644"
+    },
+    "go2_jiaohu/voice/tts_worker.py": {
+      "sha256": "2e901406d94f18ea6a0e2b94eb3ac63f0d7f4d088b469906b8fd980a5005b18c",
+      "bytes": 5028,
+      "mode": "644"
+    },
+    "go2_jiaohu/voice/visual_guidance.py": {
+      "sha256": "d84214fc616511ea894dd8acdbe94bd56965618b3f766693fde01a2bad2b1a22",
+      "bytes": 12512,
+      "mode": "644"
+    },
+    "ros2_ws/src/LICENSE": {
+      "sha256": "f7094d8ba8cbac6e103a1711911085b3931f8669be3e005a27c4c237a7a23664",
+      "bytes": 1078,
+      "mode": "644"
+    },
+    "ros2_ws/src/README.md": {
+      "sha256": "fdd9cd6d10dd7e8cd8d46e6496d5516641e0d0b9814b7b0c6a812e824abee1bb",
+      "bytes": 4472,
+      "mode": "644"
+    },
+    "ros2_ws/src/README_zh.md": {
+      "sha256": "72119f377b3bc083079d83be87162fbae1b39cab2e950cc40c9abff790f755cb",
+      "bytes": 4195,
+      "mode": "644"
+    },
+    "ros2_ws/src/fast_lio/.github/stale.yml": {
+      "sha256": "43f4c7c1cd847756a97d5415b630aa143768865b8252273cb1b3ab10326b1ab8",
+      "bytes": 682,
+      "mode": "644"
+    },
+    "ros2_ws/src/fast_lio/CMakeLists.txt": {
+      "sha256": "99dc8282a34c680eb5a4fd4868931ff5fd574863bfcf2df962ed182de2e39e3a",
+      "bytes": 3710,
+      "mode": "644"
+    },
+    "ros2_ws/src/fast_lio/LICENSE": {
+      "sha256": "8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643",
+      "bytes": 18092,
+      "mode": "644"
+    },
+    "ros2_ws/src/fast_lio/Log/fast_lio_time_log_analysis.m": {
+      "sha256": "725cc3513ec0b595e627cce7ed3d97f05f21dcfb9a96d0df35f9c384d498cafe",
+      "bytes": 5182,
+      "mode": "644"
+    },
+    "ros2_ws/src/fast_lio/Log/guide.md": {
+      "sha256": "d4e10f2ef2e603ff315da181f59228453ed673a787174b00fc875ae8b0458d4e",
+      "bytes": 156,
+      "mode": "644"
+    },
+    "ros2_ws/src/fast_lio/Log/plot.py": {
+      "sha256": "35dde400d760b5d6dda40cb65f251b1b8206973f256e0b7eda0866c6db549e27",
+      "bytes": 3104,
+      "mode": "644"
+    },
+    "ros2_ws/src/fast_lio/README.md": {
+      "sha256": "81d183c08616cbf83d7bf935e73009de7383299c3087e8f0bebb7ff00a82d08d",
+      "bytes": 10863,
+      "mode": "644"
+    },
+    "ros2_ws/src/fast_lio/config/avia.yaml": {
+      "sha256": "47de1f48a605b04a8fcec4a98a41a13a502dcd5ad39d06ad1c75c9d737e74e00",
+      "bytes": 2066,
+      "mode": "644"
+    },
+    "ros2_ws/src/fast_lio/config/horizon.yaml": {
+      "sha256": "816688b9c73a6d93e7f1331ac5d15d4f5720c55bf2bac9c4076b9e2c91e1d730",
+      "bytes": 2079,
+      "mode": "644"
+    },
+    "ros2_ws/src/fast_lio/config/mid360.yaml": {
+      "sha256": "0fba8e5d317235b964b84813c9f6019dabd4267f29bedfa03595f29c0cf80aa1",
+      "bytes": 2328,
+      "mode": "644"
+    },
+    "ros2_ws/src/fast_lio/config/ouster64.yaml": {
+      "sha256": "fbf800038ce8ed2a7be23d1a55f6263f86fa6288b881ba871a59ec7f3ace9cb1",
+      "bytes": 2185,
+      "mode": "644"
+    },
+    "ros2_ws/src/fast_lio/config/velodyne.yaml": {
+      "sha256": "c3a5c83dd3073a62416a2e0f5a0b436288e1fa41fad46e30d6dd8cacbc635e6f",
+      "bytes": 2297,
+      "mode": "644"
+    },
+    "ros2_ws/src/fast_lio/include/Exp_mat.h": {
+      "sha256": "abce87e1fb0e60febf42f38b75f4c018bac24c1bf652e26b7a510a9296d3031d",
+      "bytes": 2743,
+      "mode": "644"
+    },
+    "ros2_ws/src/fast_lio/include/IKFoM_toolkit/esekfom/esekfom.hpp": {
+      "sha256": "b990411209fe06ae64112c8bc807b0c2a13922fc1460ec2745c6701cc9344e85",
+      "bytes": 68556,
+      "mode": "755"
+    },
+    "ros2_ws/src/fast_lio/include/IKFoM_toolkit/esekfom/util.hpp": {
+      "sha256": "3c4265d25ea3f8c7f586d1e34bc352e981e09e30555e42011cd23a0a147d6918",
+      "bytes": 2363,
+      "mode": "755"
+    },
+    "ros2_ws/src/fast_lio/include/IKFoM_toolkit/mtk/build_manifold.hpp": {
+      "sha256": "0e88522551d02e78dc995e6c9d7883d9ecca7190379ec047ab839fff7186ea0f",
+      "bytes": 9436,
+      "mode": "755"
+    },
+    "ros2_ws/src/fast_lio/include/IKFoM_toolkit/mtk/src/SubManifold.hpp": {
+      "sha256": "96709f0f453a0c8776b1969064275ebf14dc5234b7024e68eb1cfc51a513864f",
+      "bytes": 4886,
+      "mode": "755"
+    },
+    "ros2_ws/src/fast_lio/include/IKFoM_toolkit/mtk/src/mtkmath.hpp": {
+      "sha256": "f9627989cf578f35ec5594a6956b4e9283d4dd109b26e7d2621682c508546295",
+      "bytes": 10176,
+      "mode": "755"
+    },
+    "ros2_ws/src/fast_lio/include/IKFoM_toolkit/mtk/src/vectview.hpp": {
+      "sha256": "7855408124ea65df4423bae5f97d5104af5552318796bc6324bdbf98a45101f3",
+      "bytes": 6540,
+      "mode": "755"
+    },
+    "ros2_ws/src/fast_lio/include/IKFoM_toolkit/mtk/startIdx.hpp": {
+      "sha256": "79cdc368bb4e083f5fda7549094c0aba8b599aee1f88e9f2a8b7fa785bf1f757",
+      "bytes": 12515,
+      "mode": "755"
+    },
+    "ros2_ws/src/fast_lio/include/IKFoM_toolkit/mtk/types/S2.hpp": {
+      "sha256": "f861be0bbb1a80d968189c90f9ef6b8e56b5f4bb19a9043a2e41c9397c215d56",
+      "bytes": 9971,
+      "mode": "755"
+    },
+    "ros2_ws/src/fast_lio/include/IKFoM_toolkit/mtk/types/SOn.hpp": {
+      "sha256": "90a8384a05d656698e6826b892561dc6cd619b62a7e32f9e6e3a9253e5e0c8aa",
+      "bytes": 10624,
+      "mode": "755"
+    },
+    "ros2_ws/src/fast_lio/include/IKFoM_toolkit/mtk/types/vect.hpp": {
+      "sha256": "771ecededd51dc694bdadb57f8a49fad7bc6091c6f6112142096954649ac405f",
+      "bytes": 14226,
+      "mode": "755"
+    },
+    "ros2_ws/src/fast_lio/include/IKFoM_toolkit/mtk/types/wrapped_cv_mat.hpp": {
+      "sha256": "3040f43fcb4195a2572a8819be012ebd2c4b59a38cfae86fcac3e01d7039a589",
+      "bytes": 3236,
+      "mode": "755"
+    },
+    "ros2_ws/src/fast_lio/include/common_lib.h": {
+      "sha256": "bd9d6cf500f6f77e880c0cbf451ce6fc8b0e6d638773a4580a1ee779744e9e54",
+      "bytes": 8059,
+      "mode": "644"
+    },
+    "ros2_ws/src/fast_lio/include/frontend_guard.hpp": {
+      "sha256": "b10d9aa1aae6b3b785eca46a741bb84fa2cef69fe5ad864ced7a6a9fb192aae7",
+      "bytes": 2170,
+      "mode": "644"
+    },
+    "ros2_ws/src/fast_lio/include/ikd-Tree/README.md": {
+      "sha256": "a7f6feab008dc54a053963fb518e360389ee807af63ebddcc15e90b1ede78073",
+      "bytes": 73,
+      "mode": "644"
+    },
+    "ros2_ws/src/fast_lio/include/ikd-Tree/ikd_Tree.cpp": {
+      "sha256": "ec3cbbbb6386eb6c68f9aa081c48b5d62209ada44fe167a002d4e3b112a1ea9f",
+      "bytes": 68733,
+      "mode": "644"
+    },
+    "ros2_ws/src/fast_lio/include/ikd-Tree/ikd_Tree.h": {
+      "sha256": "bb87cab944c6c59e0be61cb0b3a2cd0e334d93dc1bf768875058857278135a4b",
+      "bytes": 10279,
+      "mode": "644"
+    },
+    "ros2_ws/src/fast_lio/include/matplotlibcpp.h": {
+      "sha256": "360d70cb9a7dd6cb981622871204c394b56f856ef42abd0e07a011a5e146f4d6",
+      "bytes": 81837,
+      "mode": "644"
+    },
+    "ros2_ws/src/fast_lio/include/so3_math.h": {
+      "sha256": "e02f73dc804c3f539a80fe49d4221a85dbfeaee4cf0b643d7af062b49148e9f7",
+      "bytes": 2936,
+      "mode": "644"
+    },
+    "ros2_ws/src/fast_lio/include/use-ikfom.hpp": {
+      "sha256": "1ee2c078ee757ff2dffedf48da764daec152baa79876a70785d010cc2e6165ab",
+      "bytes": 4337,
+      "mode": "644"
+    },
+    "ros2_ws/src/fast_lio/launch/gdb_debug_example.launch": {
+      "sha256": "f635965b011c5f4872be2a1cc0fe711d0a999bc7d489bab4c401cbb41318103e",
+      "bytes": 962,
+      "mode": "644"
+    },
+    "ros2_ws/src/fast_lio/launch/mapping.launch.py": {
+      "sha256": "60f12a49d9706074bd4a691e8d68d67ddf4cedcd720978a166940118e59518f4",
+      "bytes": 2334,
+      "mode": "644"
+    },
+    "ros2_ws/src/fast_lio/msg/Pose6D.msg": {
+      "sha256": "91b5397207076295c2b20273552b80267e258a749ae1a932dc00f48cfc31334f",
+      "bytes": 597,
+      "mode": "644"
+    },
+    "ros2_ws/src/fast_lio/package.xml": {
+      "sha256": "acc499023db04ddf2e2ad6c016e2830edfc2317be8bca50efb2d5a0fe79934cb",
+      "bytes": 1192,
+      "mode": "644"
+    },
+    "ros2_ws/src/fast_lio/rviz/fastlio.rviz": {
+      "sha256": "4908b856b6e8b61eec6512de360ac3868243539bb89b1c32d5ce7de2cda8712a",
+      "bytes": 9335,
+      "mode": "644"
+    },
+    "ros2_ws/src/fast_lio/rviz_cfg/loam_livox.rviz": {
+      "sha256": "cea6f0134e2b63feb5d619510823a827fd598f8b5542f42db58a4df952d89947",
+      "bytes": 11178,
+      "mode": "644"
+    },
+    "ros2_ws/src/fast_lio/src/IMU_Processing.hpp": {
+      "sha256": "41c6ee97f4b45f5145315aa3623e9d835a28ed1909ac919e47c783778aa64fb0",
+      "bytes": 13150,
+      "mode": "644"
+    },
+    "ros2_ws/src/fast_lio/src/laserMapping.cpp": {
+      "sha256": "df109eced7dd61ee2df564b3f017526e268137f4f2a51c26652c9c1281ba1724",
+      "bytes": 80470,
+      "mode": "644"
+    },
+    "ros2_ws/src/fast_lio/src/preprocess.cpp": {
+      "sha256": "6e0b83678ea02e6e0a16a05ee0f788034f927468891bdadb6b30d9b1fadda841",
+      "bytes": 30390,
+      "mode": "644"
+    },
+    "ros2_ws/src/fast_lio/src/preprocess.h": {
+      "sha256": "3abe641dbf7718cbc5e6ad331842f6d3ccbdeb32cc72e9caa168fc30b65a7889",
+      "bytes": 5296,
+      "mode": "644"
+    },
+    "ros2_ws/src/fast_lio/test/check_sparse_geometry_ros.py": {
+      "sha256": "e29b17a6a4421c18dad546004e4d1f888da376b5d54aa4fe2acc537b544ea5a9",
+      "bytes": 5204,
+      "mode": "644"
+    },
+    "ros2_ws/src/fast_lio/test/test_frontend_guard.cpp": {
+      "sha256": "97a90e8d351dbdb0ebf9f02c9dcc44e59182206a870d0ae764a701c38501a5be",
+      "bytes": 3027,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_core/CMakeLists.txt": {
+      "sha256": "d0b35ee69400d142e65c6402adb58e5a975a68f09a9387e5f1a547e07bb95676",
+      "bytes": 2090,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_core/config/default.rviz": {
+      "sha256": "49b63822bb5356aa85cb3fc81186b0090cd4ebb8df7a5aa2c8a729bc0af0abc6",
+      "bytes": 9224,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_core/go2_core/__init__.py": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_core/go2_core/video_stream_node.py": {
+      "sha256": "35bc234ea2915ff641a8ad2b50b6a577fb401fc91af638e66210676f24b51bdf",
+      "bytes": 7563,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_core/launch/go2_base.launch.py": {
+      "sha256": "3e9cb78f0130c93301dd262620fd040806be043d38026e31edf0a51c9f1dbe9b",
+      "bytes": 8243,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_core/launch/go2_startup.launch.py": {
+      "sha256": "89e2c296ed0feaa5cbdd3dd484148208377db9508d53124449b9f6ada1c6fb01",
+      "bytes": 2371,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_core/package.xml": {
+      "sha256": "4d6067273b3c93439c46a9f0ac701621fdf1c05926e4d15a022b2dadded0a3cb",
+      "bytes": 1011,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_core/src/go2_base.cpp": {
+      "sha256": "549d92d0490f3c0538acaa15fdd660153fe0ff58968486a939302373d62f2163",
+      "bytes": 42594,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/CMakeLists.txt": {
+      "sha256": "5967a90608c0a6ca2eca3b1a23001b6e080bbde374947d7512fd6d85abfc91f1",
+      "bytes": 3579,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/README.md": {
+      "sha256": "7a9c0694610bfe7dc66e4a81ba2d747652d246223e459a93cefb57be7fcb5966",
+      "bytes": 47310,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/config/collision_monitor.yaml": {
+      "sha256": "55476e2aa20dbd9a6636e8733baa6667e1a824b969709493ee0dbd549b36c87d",
+      "bytes": 2158,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/config/environment_mapping.yaml": {
+      "sha256": "d4983abaec1e9bd09399c399911ce7a8dd7657a50470b7788a08d730e50de19b",
+      "bytes": 1198,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/config/fast_lio_hap.yaml": {
+      "sha256": "69f3a6299f81031041c0ba6523dec849c3b9c054a1b09e0654ba871d134a8ca5",
+      "bytes": 5609,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/config/lio_environment.rviz": {
+      "sha256": "14fd71d6bdf02a8fb65a357775e810a6a65f2ee20a7a5d4f2c7819c57797677f",
+      "bytes": 11967,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/config/lio_environment_full.rviz": {
+      "sha256": "8b4ad61bbcab847ff1b83fe0066bf1353361bf6aa0fdc767bb878b6587c39145",
+      "bytes": 7944,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/config/loop_closure.yaml": {
+      "sha256": "65c2b4c107c94a362fc117aeaab21499fead7285c1cff5c582c27d1960efee1a",
+      "bytes": 2431,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/config/traversability.yaml": {
+      "sha256": "a7b1d1e2299513fbc1244b743fc395c83f9673791ab0977bf771afa1f5a84857",
+      "bytes": 2581,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/include/go2_lio_navigation/loop_registration.hpp": {
+      "sha256": "1af5a265777c8915803670cb44d5ee147a4ddb8ab7a688e793185b5eb277bd1b",
+      "bytes": 1782,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/include/go2_lio_navigation/terrain_geometry.hpp": {
+      "sha256": "ce499a5332d02d668f71986fd4021dddb530315d3440983f4339a944a138e797",
+      "bytes": 1886,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/launch/environment_view.launch.py": {
+      "sha256": "906c471a1415b487137c3026c856ecae3bb71860d7cea6f133565d0103f8dcad",
+      "bytes": 1902,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/launch/go2_lio_navigation.launch.py": {
+      "sha256": "f436e79c57c1fa5277cbb8519bc0ea7bd9f529084b85b2fefc2932cabbfbbe69",
+      "bytes": 19097,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/launch/hap_fast_lio.launch.py": {
+      "sha256": "b6a731463c65f99f76967ec4d1029a24259eefb745dc6726578b9ffb03678509",
+      "bytes": 2465,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/package.xml": {
+      "sha256": "ac0f98658f45258464e261ddeb200bb98028debceca16d07443488d42aa0a24e",
+      "bytes": 1774,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/scripts/dynamic_obstacles.py": {
+      "sha256": "9e517417abab47a4b57c34b51b9b60660f8dda5ab4f2551a9668cd2eba3d22e2",
+      "bytes": 9414,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/scripts/environment_grid.py": {
+      "sha256": "0cdd48e60a2f75c4ef7efe08aaf0e6aaf0a2f49de71b4626da015d882d378c65",
+      "bytes": 8327,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/scripts/environment_mapper.py": {
+      "sha256": "6b2c9e30ffb7807d81b998c96fdd4a8b56fac24624390740b46a32509b9c939b",
+      "bytes": 21090,
+      "mode": "755"
+    },
+    "ros2_ws/src/go2_lio_navigation/scripts/environment_terrain_display.py": {
+      "sha256": "fd804f35e26cd28a664414e9d2e5953e06cba65292159250026dbdd88ea67ad4",
+      "bytes": 5631,
+      "mode": "755"
+    },
+    "ros2_ws/src/go2_lio_navigation/scripts/idle_stand.py": {
+      "sha256": "27f2b8f13949f2f82a7c84f08d00a52b8deb6a1429f1b3f004ace190e38b37f9",
+      "bytes": 2955,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/scripts/idle_stand_guard.py": {
+      "sha256": "5b25ad6cc413300cdf3ebc37d647d7cb69cd81a8f6481cf334335958c839e6f3",
+      "bytes": 4815,
+      "mode": "755"
+    },
+    "ros2_ws/src/go2_lio_navigation/scripts/navigation_fault_guard.py": {
+      "sha256": "340a1da81278ed3e3cd057775d1974487bb429d637c10c9ae5bf74575de29419",
+      "bytes": 4269,
+      "mode": "755"
+    },
+    "ros2_ws/src/go2_lio_navigation/scripts/observation_window.py": {
+      "sha256": "de755f69883de829f7af01ac826f1b0e1c8ee4fab72bc6e797e5a0bab80ae33d",
+      "bytes": 1460,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/scripts/obstacle_memory.py": {
+      "sha256": "b666c14b699149592126ad748161841386376543d7ed90b86688fc1423bf84ec",
+      "bytes": 34659,
+      "mode": "755"
+    },
+    "ros2_ws/src/go2_lio_navigation/scripts/obstacle_memory_model.py": {
+      "sha256": "44661f04985166962353927e3231512564d8776e30a9a7a90bbd2a3385ec6b26",
+      "bytes": 28643,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/scripts/reactive_safety.py": {
+      "sha256": "4a687a5476fc5906c7101416b9fa1aa27a447984e767bf53b23a317b92faf81a",
+      "bytes": 13830,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/scripts/scan_safety_gate.py": {
+      "sha256": "a9268ee76e74556895615a154ddc191570bb82beebf588478f18e166b896c5ae",
+      "bytes": 24088,
+      "mode": "755"
+    },
+    "ros2_ws/src/go2_lio_navigation/scripts/turn_clearance.py": {
+      "sha256": "e38231a53fe847f08abbbd4334423fab06cdc289eb02314de518e1111a531667",
+      "bytes": 4281,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/src/lio_base_bridge.cpp": {
+      "sha256": "f1d4a156522b4d1a76f902f232926230c67fd962e2ddb97e5c69a179230dc86a",
+      "bytes": 20975,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/src/loop_registration.cpp": {
+      "sha256": "28c22a178f0091756cda427700581ab7c4ddab66d406a6227e03ba28b89eaff5",
+      "bytes": 8511,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/src/scan_context_loop_closure.cpp": {
+      "sha256": "52728eebf8be5228af61fbdc03892d309918370acd021b20b86f60dc171d332f",
+      "bytes": 29098,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/src/traversability_mapper.cpp": {
+      "sha256": "181fd16f4578301ac2ddd1268e4b0bd698d8e0f44adc1c09f17b30699d4c6671",
+      "bytes": 25619,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/test/check_base_feedback_ros.py": {
+      "sha256": "4040ad73060f8d3ccc731b631284c01184c2d5541decda116142f315b8792e7d",
+      "bytes": 4658,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/test/check_collision_fluency_ros.py": {
+      "sha256": "d56ecf4eccfb1f4655e397c280865d5649d3514f72f087e27ee0eacb3a35ec74",
+      "bytes": 5532,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/test/check_environment_mapping_integration.py": {
+      "sha256": "e0e2485d714df954d277bc002445887353e383d2a33683f3e6fd9251c3e735f5",
+      "bytes": 8184,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/test/check_fault_retry_ros.py": {
+      "sha256": "13120248d874ed63d7b552330672d839cd982f0de34810c2ae555f62da269c71",
+      "bytes": 3141,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/test/check_idle_stand_ros.py": {
+      "sha256": "05f810ba182f7a54e1d6ec40332421422a2336f8e29338dd7fdaa4438ac7ee56",
+      "bytes": 6100,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/test/check_lio_bridge_freshness.py": {
+      "sha256": "9f530860b8bdb9f045617cde1505a80ba564e535ec45abd0c05089a0c159b9c0",
+      "bytes": 3413,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/test/check_localization_fault_ros.py": {
+      "sha256": "ddf9c051c7f43bd875db1c4fa19ee9cbe6e1620d81642da4c493808e3879952f",
+      "bytes": 3883,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/test/check_loop_closure_integration.py": {
+      "sha256": "44c51c5d228f6d869cb858583521ec9003a1456df9faefeab2a8c74ea36b55df",
+      "bytes": 5846,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/test/check_memory_freshness_ros.py": {
+      "sha256": "d36bacc316179427caaeffa7e7dadd9e0c0751e3334b8f90126c9ee281e5a313",
+      "bytes": 5162,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/test/check_obstacle_memory_ros.py": {
+      "sha256": "81ee1f905099866d3660a04e1cdd049e6f2a61dc7df43000f78f1e110654f944",
+      "bytes": 18278,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/test/check_return_navigation_ros.py": {
+      "sha256": "1a3ad96581da2032d8cb49b271dcb4607c41d81aaa1e499ea2745fca9a5284f9",
+      "bytes": 8071,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/test/check_terrain_grid_ros.py": {
+      "sha256": "6661be9044cd9022de1f077ef23860724961ed17ed773f65d537a3a0ea988ce3",
+      "bytes": 6034,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/test/test_dynamic_obstacles.py": {
+      "sha256": "692933fdb8e59ccd85da0b112f3d68f4139e09575b3d3004a1c4eb949d50bdc1",
+      "bytes": 9367,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/test/test_environment_grid.py": {
+      "sha256": "438db920e11793f8ce67f3d0a2723b5700c5f88e68084df67c91e0570a00c291",
+      "bytes": 6751,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/test/test_fault_requests.py": {
+      "sha256": "1c02013dc640f80cde8b7ae7f014becf284a1a4b816fb537d6331a54414381e3",
+      "bytes": 1876,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/test/test_idle_stand.py": {
+      "sha256": "b5e877cf1159dee4dd899367bb99e926ce55e51b7f1afa9c9a4f088c496d636a",
+      "bytes": 4251,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/test/test_loop_registration.cpp": {
+      "sha256": "e2447e68077b726cc2bff6c53938dc7637bf5d434377c880d1bc11bc20760cfe",
+      "bytes": 8723,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/test/test_memory_rates.py": {
+      "sha256": "3f802111cff2284745eeac63f24e727cdc8caa6e15c564ad2c3d4c7e2c7fdf25",
+      "bytes": 2277,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/test/test_memory_worker.py": {
+      "sha256": "524dedd17b8b1b3ae257b5a95709e3da4c2dc7e6cc6b874551c4a1b65ca91f7a",
+      "bytes": 2120,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/test/test_observation_geometry.py": {
+      "sha256": "67635b7bb3f1c819fcf89e51266a3edc5f878376fcc521ece7ab5ffbe1bcc1e5",
+      "bytes": 3372,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/test/test_observation_window.py": {
+      "sha256": "d0603ad62664f381334dc345cf3dde82c998cb217b1bcb52ea2261752aef3af3",
+      "bytes": 2867,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/test/test_obstacle_geometry_cache.py": {
+      "sha256": "3a4cadf8f630c8334059165dfb64bbdc7a62554f06063d97b6187008f8cc1218",
+      "bytes": 2127,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/test/test_obstacle_memory.py": {
+      "sha256": "a44b6a7d0d5eddbda07984fa2dd596be457434071f5e490a1cbee7255f2f0e91",
+      "bytes": 18269,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/test/test_reactive_safety.py": {
+      "sha256": "3d9918f8edd3bebafab1e35d637bfaf15db0f1a780c8bbf05d7570310f3b0331",
+      "bytes": 10582,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/test/test_terrain_geometry.cpp": {
+      "sha256": "d659429a7892ee71984c858c145a6be03652b50c44bb7f265dd6ab7bc93944b7",
+      "bytes": 1978,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_lio_navigation/test/test_turn_clearance.py": {
+      "sha256": "a6ab799e413161b7844899707d5864f2d871030b6ebf710ccd97e743ea858975",
+      "bytes": 2293,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_mapping_f/config/mapper_params_f.yaml": {
+      "sha256": "f9f847ae7b2767e1bdf091b4acdcb5072cf708e6e1deca97e096dea9e92c9066",
+      "bytes": 2276,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_mapping_f/go2_mapping_f/__init__.py": {
+      "sha256": "24f11a77fe05969bfcd28e340338d970b9ee1c1e6a83f603738203ed5d9bb118",
+      "bytes": 41,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_mapping_f/go2_mapping_f/gate_policy.py": {
+      "sha256": "82c9ecc9353fe5c23ec1ebbbc93486d3b100e56af7211906cdb40e4632005e8c",
+      "bytes": 3142,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_mapping_f/go2_mapping_f/scan_stability_gate.py": {
+      "sha256": "b446d7543ee57cffa41094a4fb4286834b15a8f35c96df9dfeb492d3681e27b1",
+      "bytes": 5465,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_mapping_f/launch/go2_mapping_f.launch.py": {
+      "sha256": "4b08fd765a5f6828c255dd8cadbefea3868ecdb28b5b17e2e74253246362c50d",
+      "bytes": 10229,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_mapping_f/launch/go2_pointcloud_process_f.launch.py": {
+      "sha256": "3cbf8d388c786cd95194789d39a8621f47a6fdc74637e8b0442a0db4c0f2f9dd",
+      "bytes": 3889,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_mapping_f/package.xml": {
+      "sha256": "fa2cb26cb25cfd887b97a0dffa900e33b396f11876af39bd99a57a90e18e3888",
+      "bytes": 1331,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_mapping_f/resource/go2_mapping_f": {
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "bytes": 1,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_mapping_f/setup.cfg": {
+      "sha256": "dbecc320fa257d4d2b6aa4f72b6a922972f14a861ba38327248d2615eb32db30",
+      "bytes": 95,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_mapping_f/setup.py": {
+      "sha256": "b528ca1d527d2bc8e56c8b3a351e521c61ff600230e103938288ce3486457d5d",
+      "bytes": 903,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_mapping_f/test/test_gate_policy.py": {
+      "sha256": "ad5da4850b92cb4428839145155c158d772317493561f0c9f5d1db2c7404b4bb",
+      "bytes": 1303,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/CMakeLists.txt": {
+      "sha256": "d2e581ee02462f435deb8b89bd4ed04b65074aae59496aba93c91a43d8ece199",
+      "bytes": 5197,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/config/nav2_params.yaml": {
+      "sha256": "8cda461eefd05016a2c4c92b9102c90b9354bacce665fccf00ed75d588fedfe7",
+      "bytes": 20886,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/config/navigate_w_replanning_and_recovery.xml": {
+      "sha256": "dd42d3895100c5557112c58eb23d8f71dfea66114d70263c20ea7c252482a191",
+      "bytes": 1037,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/config/navigate_w_replanning_and_recovery_mppi.xml": {
+      "sha256": "5569448bec1b4ca31a658df873188ef6fd06112f53e29e84a0536ed23401c3d3",
+      "bytes": 938,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/current_obstacle_plugin.xml": {
+      "sha256": "a1ace8b7462ea81817f012c2cf6770b718cb17d73fd254c571ff03c17fa3dca8",
+      "bytes": 280,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/exact_goal_planner_plugin.xml": {
+      "sha256": "cbf4fbebf99cbc6c4bb5f05e6bced2d13905f8e51e1ad9bd6830582452300bd2",
+      "bytes": 314,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/gait_safety_critic_plugin.xml": {
+      "sha256": "46b56046b1b73b6f59dc770824c69f0a37186354f42f02d170ff664cc1ce327d",
+      "bytes": 569,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/gait_trajectory_plugin.xml": {
+      "sha256": "c7748fe9c6cd843f679721a1d564b763c1bcb34fec7371216f9c02f8df438947",
+      "bytes": 342,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/go2_navigation/2.py": {
+      "sha256": "732da13519d06f7da68765d0fc387b60bfb395cf0ebda86035e7ae9a42b07c10",
+      "bytes": 1335,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/go2_navigation/O_path_recorder.py": {
+      "sha256": "ed59ab9116f4f379294cd652c94db9fef553863a031afea1ea4ebc78f7e5b168",
+      "bytes": 2326,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/go2_navigation/__init__.py": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/go2_navigation/ceshi.py": {
+      "sha256": "ccdbbf582b4b438a1a5a1f3e1411cbb454f1d7a784c742ecbc46c11dfc951ec6",
+      "bytes": 4867,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/go2_navigation/multi_waypoint_nav.py": {
+      "sha256": "cf70e16cc21d7ce8c7a07555b8bc513d326230962dadcbee8957b9458d107fef",
+      "bytes": 5819,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/go2_navigation/navigation_command_tcpbridge.py": {
+      "sha256": "487df99102a064cb58ac51a15eefc2900ab05352a1ec55da5c10d90864347c71",
+      "bytes": 5394,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/go2_navigation/path_recorder.py": {
+      "sha256": "e55c1b54860c95e43ded811da6d033e420c9de172e16d258349cb3a2145f7445",
+      "bytes": 3566,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/go2_navigation/patrol_navigator.py": {
+      "sha256": "60d3214748924e325b2d9f5a421f1da26f59f779ef38a633160db33126013492",
+      "bytes": 5636,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/go2_navigation/patrol_navigator2.py": {
+      "sha256": "807b604d21f39812da3ab9176f58c17dd983489005c650b2204702f05cbffa1b",
+      "bytes": 2566,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/go2_navigation/patrol_navigator3.py": {
+      "sha256": "e7e4714f864aba7dfc3b53f3ad9567848601692aa84d3a41b9b509db7056a8e9",
+      "bytes": 3224,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/go2_navigation/patrol_navigator4.py": {
+      "sha256": "c2fe2d1836be355ae6d47f53259ab6ca73a3e2c894449542d5eebd1e7a1bc525",
+      "bytes": 3495,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/go2_navigation/runtime_guard.py": {
+      "sha256": "f143a3152199ec53b8a068325d30a97096a1b79d0322a9e0039c5e5e67fc1331",
+      "bytes": 3539,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/go2_navigation/safety_geometry.py": {
+      "sha256": "1d24956724982b8a32d284c0c60af240fbde6fc1e634cc8e4d5ca60d2b0941d9",
+      "bytes": 3423,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/go2_navigation/saved_path.json": {
+      "sha256": "ea5fafac0d6ea2c12577fe108234a642699f970f833d73d388ca7f5e95734ca2",
+      "bytes": 465,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/go2_navigation/tcp_client_standalone.py": {
+      "sha256": "4628ae0f38bde535d458f0371d54251ebeaa0129387899150d46d7de0a89dd4a",
+      "bytes": 4675,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/go2_navigation/terrain_profiles.py": {
+      "sha256": "1de956c22ba483ab949a728a7603f99b896732c11262769a10c133441cafddd8",
+      "bytes": 5624,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/go2_navigation/test.py": {
+      "sha256": "9ccd8a075fc4883014170f787de1782edaaf4da50e6c388f51d6c0cec49ee5dd",
+      "bytes": 5668,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/go2_navigation/track.py": {
+      "sha256": "3e4b3e76e6fccac2642e4bbc3be80465ee38c1cc0ba21e7c50f3c905d76318bc",
+      "bytes": 9795,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/go2_navigation/transforme.py": {
+      "sha256": "d602447dc07ae161bf079a453a06c3c09eb5d5eae2d0d75fd9bab6fd186c6759",
+      "bytes": 4069,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/include/go2_navigation/costmap_geometry.hpp": {
+      "sha256": "536ff5b4f7994143459cd767cfd78a154debaeb7b5afa43777f4e7c4776cb708",
+      "bytes": 2540,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/include/go2_navigation/execution_safety.hpp": {
+      "sha256": "1a652684d8f6dfa65501fb12cf4c5a52274394b1df9abc7d2e573a7c2e497b70",
+      "bytes": 9507,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/include/go2_navigation/motion_geometry.hpp": {
+      "sha256": "b6a1d7998614f4e03792ded79c48370bc1d9d7d654f8510631f4e00bea343c49",
+      "bytes": 6176,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/include/go2_navigation/rotation_helpers.hpp": {
+      "sha256": "e64e99e44d0868ac56d06b8e1c1c01ffc8323a0d708a82c78287eb8777070417",
+      "bytes": 6741,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/launch/go2_localization.launch.py": {
+      "sha256": "e7999728e124b02d5fc6083c1c52ed4bf0c95c41f791c2c5cf8c94017415773c",
+      "bytes": 6937,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/launch/go2_mapping.launch.py": {
+      "sha256": "1022a7e815449893de136e168844d2ebc08210fa318fa516066a311b54959750",
+      "bytes": 7777,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/launch/go2_nav2.launch.py": {
+      "sha256": "97f5483577cad4e55dfa905a2a527890375bbadb70efe0cb7afbdbcff7867391",
+      "bytes": 10899,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/package.xml": {
+      "sha256": "c91939e5b6b6d798d71cefe7f6085d9d018c419d8ce489fc5e5b044b76ef2341",
+      "bytes": 2180,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/src/collision_footprint_critic.cpp": {
+      "sha256": "6e72b62f3c550f78dc1f1b26813de649e42f3f70139bb69a04806d25d301f175",
+      "bytes": 2778,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/src/current_obstacle_layer.cpp": {
+      "sha256": "36a80bf558c4714dfd73dd12216e16b00aaaff93b6ee224d1e944e076488bd1d",
+      "bytes": 1710,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/src/exact_goal_smac.cpp": {
+      "sha256": "04d2f365d7d1153531bbd62d3dda96cbfd97d31f9d4d235df8ca1fde592d6f06",
+      "bytes": 2130,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/src/gait_safety_critic.cpp": {
+      "sha256": "f99f77e0326e09d86ebfe21827335a8fb33818aeb7a18336bd2c7924e63b143d",
+      "bytes": 5223,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/src/gait_trajectory_generator.cpp": {
+      "sha256": "feae7e11eac069180cd7e7f52d33df557b5b26ff8fed87ff4bd581f8c141836d",
+      "bytes": 3927,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/src/latest_goal_bt_node.cpp": {
+      "sha256": "0ae8f8bc935ab3f3e08d6851cce3040ee9045a97293c8ea27ce4879920e9d320",
+      "bytes": 2589,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/src/stable_goal_checker.cpp": {
+      "sha256": "d6b3b4200d88595ae2a06f9d88a4e91e4b5095b03e9db35ff9e6684900eb3a2e",
+      "bytes": 4071,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/src/stable_rotation_shim.cpp": {
+      "sha256": "41cfd83cf9ef49ce958953fca426a7c71ddd65819fe043e4985fe36a295de017",
+      "bytes": 24029,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/stable_rotation_plugin.xml": {
+      "sha256": "683c0321980b46f9851fac7ce5628df901156a723b6c2c0904bc082f9e82b881",
+      "bytes": 572,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/test/check_navigation_fluency.py": {
+      "sha256": "b902d1c73c2cb384fdf110b155add1defdb6cf2d00bb1581f0f7b8aba5874b7d",
+      "bytes": 17304,
+      "mode": "755"
+    },
+    "ros2_ws/src/go2_navigation/test/check_obstacle_pipeline.py": {
+      "sha256": "45656369938a04ca232a6b4e25f36f21a0c267b9506a82e0525d360d32f3fd90",
+      "bytes": 38366,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/test/check_stable_turn_integration.py": {
+      "sha256": "fb02fd56458a262a9b86fc7293d867aeac99b7abcbf4657fa412b8a95e62473d",
+      "bytes": 10595,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/test/test_gait_safety_critic.cpp": {
+      "sha256": "bb4e85d199b00c62e93c05a6f41f92d53d50b7c3be7e6c83b4081885db769fad",
+      "bytes": 5007,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/test/test_gait_trajectory_generator.cpp": {
+      "sha256": "ff927bb7307ac571e2cad473c53d182629dfb1f54dbe357bb01be751558d4d80",
+      "bytes": 3319,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/test/test_latest_goal_bt.cpp": {
+      "sha256": "ab63846c3de91186b0700b987b0a3736572986a5d36c35d4dbe7ec20c0874b0a",
+      "bytes": 2194,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/test/test_motion_geometry.cpp": {
+      "sha256": "ede18de291bbb9a8555b0f81e6500d66f76d644e8b3b57517a69a3572ea4b846",
+      "bytes": 6484,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/test/test_rotation_helpers.cpp": {
+      "sha256": "a8a81d2b180804bca977e848e7c43c11b352c96bb1a11c6c042de841c2c7dc2a",
+      "bytes": 8985,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/test/test_runtime_handoff.py": {
+      "sha256": "d627bf03b620643bceb6edd57e75befe308720ac237e7109193b3e8aab635059",
+      "bytes": 3205,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/test/test_safety_geometry.py": {
+      "sha256": "1b178721b6f9f2beca7276ec126ed9302184b1ba4e6358b77fb0a9334937e6c1",
+      "bytes": 5226,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_navigation/test/test_stable_goal_checker.cpp": {
+      "sha256": "4e9feb02dbf5590a40a556e755b5aa1b16e32b1d10d2693d22d4395691ebdf7a",
+      "bytes": 3909,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_perception/CMakeLists.txt": {
+      "sha256": "1a5f3deed4967935ad07f556de5c1b0d6efc154c6da6a23f26023bec49adab7d",
+      "bytes": 3208,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_perception/go2_perception/__init__.py": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_perception/include/pointcloud_to_laserscan/ground_plane.hpp": {
+      "sha256": "6f60e94c806baa0a1654cbf0191ecfcaf333f4c8ded82c45904e15e23113cb70",
+      "bytes": 9079,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_perception/include/pointcloud_to_laserscan/pointcloud_to_laserscan_node.hpp": {
+      "sha256": "7e795495d83f4eec9a2d84c5254ef02275025ac25adf956ade542d6f910333de",
+      "bytes": 4641,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_perception/include/pointcloud_to_laserscan/scan_projection.hpp": {
+      "sha256": "00de822c105689b55152da0ff001f48298e2632e18fc82f8005c4808dbbcf6b0",
+      "bytes": 603,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_perception/include/pointcloud_to_laserscan/visibility_control.h": {
+      "sha256": "feb3319264011bb6964b97ae392f837cad98dc6079d6d8d44102ae00bab39409",
+      "bytes": 3183,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_perception/launch/go2_pointcloud_process.launch.py": {
+      "sha256": "5d9cee21589c3174b8ae64a7750b93442d7951734576a7f504f4e4ac93f98404",
+      "bytes": 6372,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_perception/launch/livox_hap.launch.py": {
+      "sha256": "6b31eb5c231a84d0f5a010e57b51d0f09d022ae0edc8c026ac56646824fd91cc",
+      "bytes": 3345,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_perception/package.xml": {
+      "sha256": "839757b48d13bd832bb33aa5c8e7503a4e3bd3e3c62cf89730825a8af276e6ce",
+      "bytes": 1109,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_perception/src/cloud_accumulation.cpp": {
+      "sha256": "42dd05cafa30159d5a73d6d37ca228b0f836f99b7694bbba7ed30f9acdc9d506",
+      "bytes": 9993,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_perception/src/pointcloud_to_laserscan_node.cpp": {
+      "sha256": "96351fa19d68a32d14bb129cfabd5544418c7a7817b118aab320e12c16616e62",
+      "bytes": 22586,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_perception/test/check_scan_alignment_ros.py": {
+      "sha256": "0f7923e0b40e03d0b21085f097b083f6e7fd2db3d908986af88f289038f14b36",
+      "bytes": 8398,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_perception/test/check_scan_configuration_ros.py": {
+      "sha256": "bce5528bf5fff5c7396c1fc28e8a01ecc4ec0fe7dc8676ab78f39a34cdfe16b8",
+      "bytes": 4061,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_perception/test/test_ground_plane.cpp": {
+      "sha256": "389fd71157469337bd773034eb7fd794d7195de84b510986fa42ab1d48a5bbb6",
+      "bytes": 6620,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_slam/CMakeLists.txt": {
+      "sha256": "f4a67416b6e145c254efb58b249056a6fb5f7ab37c7c921df83ee6a53b8897db",
+      "bytes": 790,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_slam/config/mapper_params_online_async.yaml": {
+      "sha256": "fbc349e4e47615826ee77a3a7f19169c41e7e46f23adefa3a724da4f477592de",
+      "bytes": 3772,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_slam/launch/go2_slamtoolbox.launch.py": {
+      "sha256": "83000dc4c7976b86a0d375e77ac2b8b5642e570d466f8aace712ad6c2237c517",
+      "bytes": 1449,
+      "mode": "644"
+    },
+    "ros2_ws/src/go2_slam/package.xml": {
+      "sha256": "552f12a151dfd5c2557d73d561a53114d9ed53c1b0f31a2d729560af1c3203e2",
+      "bytes": 793,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/3rdparty/rapidjson/allocators.h": {
+      "sha256": "49b554ebfc2369438fd9365b28f0453485d936437847de31a7bb770001abca55",
+      "bytes": 10437,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/3rdparty/rapidjson/cursorstreamwrapper.h": {
+      "sha256": "de1a52b674c998a7581f9cb69c9310757f825595c3fef985d5d153f7ac1b6aaf",
+      "bytes": 2230,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/3rdparty/rapidjson/document.h": {
+      "sha256": "6afae6a8825b03b4c6baa42a513e5a5242ac96b4c95968c07ee8bda8163eb3ff",
+      "bytes": 117966,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/3rdparty/rapidjson/encodedstream.h": {
+      "sha256": "4bb5e4853943d5ead467e46b5313d95aa23645018cda93e7907a934a06cfbb26",
+      "bytes": 10634,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/3rdparty/rapidjson/encodings.h": {
+      "sha256": "0201c664e471c615b5cd27d2e981cf8b21ac9c210bdf108062fb2fd9d493a501",
+      "bytes": 29827,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/3rdparty/rapidjson/error/en.h": {
+      "sha256": "484dcd32c0b35b7a81561740fad970402c0ffcec44311381a2fb265cfe5e273c",
+      "bytes": 3739,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/3rdparty/rapidjson/error/error.h": {
+      "sha256": "aa9b40b61754b227248b4b092331dbd5721ef6565d962e4c225c6c1e7974817e",
+      "bytes": 6472,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/3rdparty/rapidjson/filereadstream.h": {
+      "sha256": "8c7d282eb32897969430f5a94178cab238433e25fa139ee74eda87eb1d42690a",
+      "bytes": 2961,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/3rdparty/rapidjson/filewritestream.h": {
+      "sha256": "1db49a4cd9038f2670667e5900f346d231a0eece06ac1817f33feb63f33545b9",
+      "bytes": 3073,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/3rdparty/rapidjson/fwd.h": {
+      "sha256": "2a0e024b8b6b87d1d3f50d1d0dd4656124c161fea88406265d097d613498854e",
+      "bytes": 4120,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/3rdparty/rapidjson/internal/biginteger.h": {
+      "sha256": "0be8375c2d39bc1f8f57b755a26569db9ed35c86d066b294911690513786afb3",
+      "bytes": 8296,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/3rdparty/rapidjson/internal/clzll.h": {
+      "sha256": "93d71c879a805a8c17cfd8913cf1add4d2f25407bbf668abe1dcca6e40ebc746",
+      "bytes": 2035,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/3rdparty/rapidjson/internal/diyfp.h": {
+      "sha256": "f2c45af9e73a451e5472e5dd10a7672085e9a3504d1f3ab864a5b9cc7445c1eb",
+      "bytes": 11387,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/3rdparty/rapidjson/internal/dtoa.h": {
+      "sha256": "965deca8d1382c30db9e0a1d51200a4934bfe032eda3dcde10d4bdb39817c05a",
+      "bytes": 7724,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/3rdparty/rapidjson/internal/ieee754.h": {
+      "sha256": "a1b4a88d5e0f633e99c7d68a34fdebc6289e6be0f0cfba452a7793166d7ea970",
+      "bytes": 2990,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/3rdparty/rapidjson/internal/itoa.h": {
+      "sha256": "45c96bab2327aee5ff999167fac8f768a3a9e1003142fa68e3aee50b54d93e12",
+      "bytes": 9272,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/3rdparty/rapidjson/internal/meta.h": {
+      "sha256": "a20dad578c7d714ff04029f04719df19be5835c30bf9c7028d226e67d065bf0b",
+      "bytes": 6731,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/3rdparty/rapidjson/internal/pow10.h": {
+      "sha256": "7a7693969c936ddb6d036467a0f6b53def076922bb838d250eb40f12b2e2ce0e",
+      "bytes": 3957,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/3rdparty/rapidjson/internal/regex.h": {
+      "sha256": "624cf078b8179a198374eebe94331aa2d8b70b08997f4e270ccfaccc90fd09b2",
+      "bytes": 23238,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/3rdparty/rapidjson/internal/stack.h": {
+      "sha256": "46c4f98ff2acce64d1280458dd1224aaee9a9035eebd3462cdf31ee25a13702e",
+      "bytes": 6805,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/3rdparty/rapidjson/internal/strfunc.h": {
+      "sha256": "e083b68f7bf3570653fce1e3ea0a573a75745a096dd80194e1a2fde4d7695bb8",
+      "bytes": 2184,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/3rdparty/rapidjson/internal/strtod.h": {
+      "sha256": "2134c15ad40b9584ecb8e1a7f6163277a6d783574b3fb08574f88ab769b91751",
+      "bytes": 8656,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/3rdparty/rapidjson/internal/swap.h": {
+      "sha256": "48ecb57c3b2ca955ad3cccdfff03835be495a56c9c5da07ab9c02f488b7d7fe1",
+      "bytes": 1421,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/3rdparty/rapidjson/istreamwrapper.h": {
+      "sha256": "b3c03a5826b8d8c9dfcef64eb09d8ec4a955e0c6edd38d9c3a127dbca53ec2dc",
+      "bytes": 4112,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/3rdparty/rapidjson/license.txt": {
+      "sha256": "a140e5d46fe734a1c78f1a3c3ef207871dd75648be71fdda8e309b23ab8b1f32",
+      "bytes": 5152,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/3rdparty/rapidjson/memorybuffer.h": {
+      "sha256": "cf661606aa41bee3466cee20174bc7454210e8aabac929b1d8e9e189fef601ab",
+      "bytes": 2573,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/3rdparty/rapidjson/memorystream.h": {
+      "sha256": "8dd07eb66381de95a69c9cadce537d76c0349f913cfe183ab6243c54863c4dcf",
+      "bytes": 2673,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/3rdparty/rapidjson/msinttypes/inttypes.h": {
+      "sha256": "92f53d3ba0cdebaeb20a52893f89d0c29aae5111a3a8bb555eabdd8c96e3244f",
+      "bytes": 7824,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/3rdparty/rapidjson/msinttypes/stdint.h": {
+      "sha256": "515ff5e244372892293c20bbfe6a5b3dcca7265442941df31dcebdfbe2a828fe",
+      "bytes": 9151,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/3rdparty/rapidjson/ostreamwrapper.h": {
+      "sha256": "366d953184777b0de0a102ef38cf56f9fc766422246f16be9af2dad8ad787054",
+      "bytes": 2342,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/3rdparty/rapidjson/pointer.h": {
+      "sha256": "d74ab63c76a99a5a92418d2420cc733c22767b6d9e9a6f989689940de4f7c478",
+      "bytes": 60230,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/3rdparty/rapidjson/prettywriter.h": {
+      "sha256": "e8495e521c5d726c7e2ff59b1f7eb6f08a1e0298055d1fbbc4f29f08d736360d",
+      "bytes": 10253,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/3rdparty/rapidjson/rapidjson.h": {
+      "sha256": "22ffbcb054cecc5180bdb72478ab32598c9aa40421322f17923809acdcf99629",
+      "bytes": 24293,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/3rdparty/rapidjson/reader.h": {
+      "sha256": "291f6d315a3617c9bd83d8b2836f9dc1e45a2a9770dcb0745f9eaaa603b715a6",
+      "bytes": 89290,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/3rdparty/rapidjson/schema.h": {
+      "sha256": "473b44fcb9f88d2fa7439e1c9f86899deae44205323a7ba7709e6b4b513f01fa",
+      "bytes": 101259,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/3rdparty/rapidjson/stream.h": {
+      "sha256": "58e37336dafded31177eb2381f0d553de8a5fd33c8580873de32b0e467d85677",
+      "bytes": 6694,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/3rdparty/rapidjson/stringbuffer.h": {
+      "sha256": "8434f52ca786bf876b3d3d693ce8e2d399325ddf891e0437becd41ed590806e9",
+      "bytes": 3984,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/3rdparty/rapidjson/writer.h": {
+      "sha256": "b42eca28a42d7b3806aaf691ee921accabcf911be6728c35fa04e14162a72bdf",
+      "bytes": 26178,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/CHANGELOG.md": {
+      "sha256": "3d6459d5d6c06a26f5bf8e9d4f0a58a6d4be418bd730f49b5fa9d0ff96e87042",
+      "bytes": 1833,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/CMakeLists.txt": {
+      "sha256": "1a2358d088640ef56ca06299160850086203b875dcbee9cd207249d891690971",
+      "bytes": 11642,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/LICENSE.txt": {
+      "sha256": "5d965fd1439196751d5ccad8064a51dafdb2d88548174bb5516d393c7a4c0717",
+      "bytes": 19928,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/LOCAL_CHANGES.md": {
+      "sha256": "222ec415e7ff1982d59a0f50323b400c86eac77cb0e598d5a64f24cada380bed",
+      "bytes": 2400,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/README.md": {
+      "sha256": "8ae5d78318bd37dff9fb9b71fc145f7793af92e36f71b46eeb7dd738c283c313",
+      "bytes": 21774,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/build.sh": {
+      "sha256": "05ffb76f017e796ff5230b53ad4e8e2bcd52e43ce2215e03c4ee78a44cb46b7a",
+      "bytes": 1763,
+      "mode": "755"
+    },
+    "ros2_ws/src/livox_ros_driver2/cmake/version.cmake": {
+      "sha256": "698b065d680a20695f2163ca5bbe601792b24069357919bee3136768d75f8f7f",
+      "bytes": 990,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/config/AVIA2_config.json": {
+      "sha256": "53bfe4aba27dc64bdcac05cbbefbbcfe7defd1e700e73a62234e07f3fdc08af3",
+      "bytes": 767,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/config/HAP_config.json": {
+      "sha256": "cf40ec35f776adf8d60a4935adc5b510361becd842cfb34305f380dd2a2a7b31",
+      "bytes": 869,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/config/MID360_config.json": {
+      "sha256": "6eba01156ce604a5a5aab8b102179d21ba0729aa4652cd9b0d2ad2a6afd7ca4d",
+      "bytes": 884,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/config/MID360s_config.json": {
+      "sha256": "874b4c619dfe7ed7172631df462c0ac433eb9b5e667ef9595567f9261e77bcae",
+      "bytes": 794,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/config/display_point_cloud_ROS1.rviz": {
+      "sha256": "89d934b783d9f0386dbaef7cbbf0ea3f4ee0c87c57b313178d822cec93320caf",
+      "bytes": 5650,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/config/display_point_cloud_ROS2.rviz": {
+      "sha256": "ae7cea85c28bcb532f3504994aa287ad14100048cd53b30821b73df0a1f94e61",
+      "bytes": 4834,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/config/mixed_HAP_MID360_config.json": {
+      "sha256": "99895013db7bfc1d58fef1abb2d25461624ab468bce5f5c4381172f3b7d235cf",
+      "bytes": 1665,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/launch_ROS1/msg_AVIA2.launch": {
+      "sha256": "7128281f51e050f171cc9b02eef8891b4d3aa149610a3bd9a19496a681bb8a68",
+      "bytes": 1743,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/launch_ROS1/msg_HAP.launch": {
+      "sha256": "2bb9adeab763da7a414fe756fa0569e41ab4795722817ad950a39450f97813ef",
+      "bytes": 1743,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/launch_ROS1/msg_MID360.launch": {
+      "sha256": "b4a86ae5e58d354e454140fe6e3b0032193826f764ed8da9f6d1519ba99f60dd",
+      "bytes": 1744,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/launch_ROS1/msg_MID360s.launch": {
+      "sha256": "623d0aac93ff6bb54688fb132f441248b33d7331376df30ebb77e736023da850",
+      "bytes": 1745,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/launch_ROS1/msg_mixed.launch": {
+      "sha256": "77c8f7eed8d2702211f52db053f792f2b5906123e8ab647a913313bb015c6ab8",
+      "bytes": 1754,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/launch_ROS1/rviz_AVIA2.launch": {
+      "sha256": "b04a2114fceaf0e5cc2c10de15c9bb688f3faf6e8545ac742ecf0d6442f3d422",
+      "bytes": 1932,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/launch_ROS1/rviz_HAP.launch": {
+      "sha256": "be4b09a282eb005128933ec802d0658d273ebe5b91dc65d0413a78c603ee3f78",
+      "bytes": 1930,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/launch_ROS1/rviz_MID360.launch": {
+      "sha256": "03a622737d58ac346261ad5bf87df109d3c339184c1baeee11ba8371396f6578",
+      "bytes": 1933,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/launch_ROS1/rviz_MID360s.launch": {
+      "sha256": "0786538975f8cb314680f747d3ddacd4d093093e944d94b1d9f10a67bccb2b95",
+      "bytes": 1934,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/launch_ROS1/rviz_mixed.launch": {
+      "sha256": "bb9830540646897bb52e4abd76947232a751b27f0f9ec7c4fedc953bb4fbcb79",
+      "bytes": 1943,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/launch_ROS2/msg_AVIA2_launch.py": {
+      "sha256": "cceb8d4a61009c7a7437a53bf66e76ce11356ddf51ea50f2205c476b9956a756",
+      "bytes": 1901,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/launch_ROS2/msg_HAP_launch.py": {
+      "sha256": "bb58699d0b6d344f579f5b2991db54561621ddb395e6ade8c94425c563cd9ef6",
+      "bytes": 1968,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/launch_ROS2/msg_MID360_launch.py": {
+      "sha256": "11b0618d2a9a0def7f6e1a6831646d261674014344496fa1497fea67d6c0e826",
+      "bytes": 1902,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/launch_ROS2/msg_MID360s_launch.py": {
+      "sha256": "29d48e9e2dd2b21352e4ecff9c0a7db2a18994fe688dc68f361b3b70b33ee05a",
+      "bytes": 1903,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/launch_ROS2/rviz_AVIA2_launch.py": {
+      "sha256": "494e82e04dea8494538f62c98f57549cc80e1da59378c7e63044b4a4056f4db6",
+      "bytes": 2188,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/launch_ROS2/rviz_HAP_launch.py": {
+      "sha256": "da07dc3d0402cccffe3e068108066fede37ed71ef47c191541158665d67b478f",
+      "bytes": 2186,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/launch_ROS2/rviz_MID360_launch.py": {
+      "sha256": "8331565b4c8fe1a80ec77d518b4bb2fcbe40ea8bf60a20de691d9c61417b678e",
+      "bytes": 2189,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/launch_ROS2/rviz_MID360s_launch.py": {
+      "sha256": "5660e8982e12c003bac4880b6804b27a611e2c6fda999ebc454e173282e9614b",
+      "bytes": 2190,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/launch_ROS2/rviz_mixed.py": {
+      "sha256": "decc75ab24173f20455c849c0cbe6cb3931d33d4901f39b52c105d381405b8d0",
+      "bytes": 2199,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/msg/CustomMsg.msg": {
+      "sha256": "f42d6709db951b1fa307e929e742c0593cbf0d1b0ff977d2ed63ad8d7cee0a96",
+      "bytes": 341,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/msg/CustomPoint.msg": {
+      "sha256": "b64b31a8edc8c8b3765d82b5d3ccd2d2e1f217b9525ef7007ab918674c619c59",
+      "bytes": 353,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/package.xml": {
+      "sha256": "084b1db3a68ef3cf979da0c8ce6a8bf9566dc586ebfdd51d0dbe012f43c3d2dd",
+      "bytes": 1123,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/package_ROS1.xml": {
+      "sha256": "2e3eb6932e9fe365d31aa69926aa6cae76464f4176008cf33de26f0fbee29c27",
+      "bytes": 3395,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/package_ROS2.xml": {
+      "sha256": "084b1db3a68ef3cf979da0c8ce6a8bf9566dc586ebfdd51d0dbe012f43c3d2dd",
+      "bytes": 1123,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/src/call_back/lidar_common_callback.cpp": {
+      "sha256": "8f37b7dda4236edbcb4a87cfa6a016e4105ca1e0b8e0e99f2446953636412196",
+      "bytes": 2276,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/src/call_back/lidar_common_callback.h": {
+      "sha256": "e0fd66f13ad20b0426b9b5384abee61c8b2b85ace2e9904c470da9fd7c0cc366",
+      "bytes": 1575,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/src/call_back/livox_lidar_callback.cpp": {
+      "sha256": "50fec08a89c3be6ddd423632f508b4b7179d43303a3206f6a26fbef5d2e9e665",
+      "bytes": 15505,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/src/call_back/livox_lidar_callback.h": {
+      "sha256": "8b491e57ee77c0b020458338f5bf9a5b8776c0d875c96654531e622e92159c45",
+      "bytes": 3238,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/src/comm/cache_index.cpp": {
+      "sha256": "dca25f47674f530249e94c0ac8ac368d122910ca66336bd1bee65a06d2f01667",
+      "bytes": 3858,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/src/comm/cache_index.h": {
+      "sha256": "65c635bd6903564bc1e0547113a6aff52e592c16295ed23264b5726317327c01",
+      "bytes": 2055,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/src/comm/comm.cpp": {
+      "sha256": "73e6b7469337528ffb60b0f670bedc3c01dfcd7d8a048e72e8f04bd5d839f126",
+      "bytes": 2209,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/src/comm/comm.h": {
+      "sha256": "72c639ba1d6eaf7c355050672c865c7615cea3619abee628683d98920fb31fa4",
+      "bytes": 8580,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/src/comm/device_clock.h": {
+      "sha256": "1e1d898b3373fd55779da6febc26e50c3d2e0bb56a6cf3e75918d9b5eceadf77",
+      "bytes": 1012,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/src/comm/ldq.cpp": {
+      "sha256": "b5a11f2b4b658e4fc2c53dc261a7401e09516a6276e9b1a9c7568a4ee6d86a3f",
+      "bytes": 4682,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/src/comm/ldq.h": {
+      "sha256": "01ccf8d13f84475cb126dea1f15546a59ce9398968360e6484da5832729aa077",
+      "bytes": 2330,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/src/comm/lidar_imu_data_queue.cpp": {
+      "sha256": "7f9ecbdad433653233b2701dbd06dd4f7f523d0e972cc5cb4bf0aca2ed7494b5",
+      "bytes": 2248,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/src/comm/lidar_imu_data_queue.h": {
+      "sha256": "cc8ae6d425cf6fb173b59072e5310f7b984e776a9d8277c8e9e0ef9d9dc58998",
+      "bytes": 2632,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/src/comm/pub_handler.cpp": {
+      "sha256": "270812c6638c4bf130d3eabf274febe6effc62622fe08886f5f102aec575673e",
+      "bytes": 19368,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/src/comm/pub_handler.h": {
+      "sha256": "b1243bef8cd4f671f2953e7a211b689f8427e4d94203f3747e46766fcf842ce5",
+      "bytes": 4635,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/src/comm/semaphore.cpp": {
+      "sha256": "7ea77d2b2b9f5aca1aa1c4f239d427398699b504a25b5bcd1667545650a0c587",
+      "bytes": 1470,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/src/comm/semaphore.h": {
+      "sha256": "a07dedf139d6a1f85d572b23f4a69b1f0574577366b2ecd759f06da4995eadcb",
+      "bytes": 1623,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/src/comm/test_device_clock.cpp": {
+      "sha256": "a4e1e8cccc7671104f663f695474089bc45ab08b46226132ba25f63ec763d29b",
+      "bytes": 1445,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/src/driver_node.cpp": {
+      "sha256": "bbfd81c99bc8daf9ad77a920457267d916be962bd514fd06f1e9935e210393bc",
+      "bytes": 1687,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/src/driver_node.h": {
+      "sha256": "503851a1fe806c633377f891479b8b434e89a0ac4070db80d9e3b8fc36070a6a",
+      "bytes": 2482,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/src/include/livox_ros_driver2.h": {
+      "sha256": "ee561a4a46c044994b94ccb47f479774b2d47745d96d1827bf75aa92d43b85ee",
+      "bytes": 1734,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/src/include/ros1_headers.h": {
+      "sha256": "25d868b0c4e1972ad61619b26e47c5538d282b520143f6c03300b0adeab8fb0b",
+      "bytes": 2216,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/src/include/ros2_headers.h": {
+      "sha256": "16aa2833be3b35acb0bbb9c71e78e261f65d7251740565571ae24d2c43b579d1",
+      "bytes": 2478,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/src/include/ros_headers.h": {
+      "sha256": "67c52fefe87f71fb83d99774ba8569fff0de7c698a6917c31de2f4ccff3c78eb",
+      "bytes": 1341,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/src/lddc.cpp": {
+      "sha256": "4a5a1b3d078739e988bc7698498934c54f1ce585c1fa0569b6e8bf9b969adc83",
+      "bytes": 23103,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/src/lddc.h": {
+      "sha256": "31a78f172caf82f3b2938c9e2c296cd582da228d0043c17849f7a9b20788d4ea",
+      "bytes": 5868,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/src/lds.cpp": {
+      "sha256": "e48af4e651e074f93426ca7862feea66d6aae9d7ebb725dfb01ecc1b668428be",
+      "bytes": 6084,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/src/lds.h": {
+      "sha256": "4a2c756021d7f08047dcaad5fca02bde10759ce76926c4b63318f568e4d4afd2",
+      "bytes": 2711,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/src/lds_lidar.cpp": {
+      "sha256": "79bc97adfcf86ee64b7069abd1d549978d74a8814d1374bfc3e82982b62d38ff",
+      "bytes": 6728,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/src/lds_lidar.h": {
+      "sha256": "2a36a2f0c890ce7a4692a8e546a8dca5b1c8815766788f1ad95dc89a3d943822",
+      "bytes": 2705,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/src/livox_ros_driver2.cpp": {
+      "sha256": "5be8fe1854e345660e78cf4f1c600eb87bb34ead54ef50b16033fba0cecdd621",
+      "bytes": 7899,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/src/parse_cfg_file/parse_cfg_file.cpp": {
+      "sha256": "f893a7397f05e81826d6097233ae6a90d3428f921ceb04d9f957427f4bcf7e5e",
+      "bytes": 2381,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/src/parse_cfg_file/parse_cfg_file.h": {
+      "sha256": "c0512f0ddb732861ec152e93d7d6477dd620865b4a92c385379d013286506998",
+      "bytes": 1721,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/src/parse_cfg_file/parse_livox_lidar_cfg.cpp": {
+      "sha256": "ce7cc5df5f7e09768a2d256f0d1cae30ae9c6214d821be95036311cef08912ed",
+      "bytes": 5293,
+      "mode": "644"
+    },
+    "ros2_ws/src/livox_ros_driver2/src/parse_cfg_file/parse_livox_lidar_cfg.h": {
+      "sha256": "1d5b9f606deedb7c78e1a6d0c3c10d62a886fcc2aac1ac42e1a4a1ae6a9b6d49",
+      "bytes": 2018,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_h264_repub/CMakeLists.txt": {
+      "sha256": "5022b43dfc837e59c475f39792d9d37d2913268caf8f2ffce31081e136278f52",
+      "bytes": 1491,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_h264_repub/package.xml": {
+      "sha256": "541e3c47c1afdb5c4e6a02ee353bdc0ac5ab9554dd382b3ab2ba1201a4fac43f",
+      "bytes": 712,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_h264_repub/src/go2_h264_repub.cpp": {
+      "sha256": "86d154845d661278eb2470ac2e748d4998c148f16e45c03c5bb17e5efb6d8f54",
+      "bytes": 2054,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/CMakeLists.txt": {
+      "sha256": "b2428c05ce66a427f5d399ca0b986e1d6f015277c8944e30cc838a5dd684194c",
+      "bytes": 2011,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/include/common/motor_crc.h": {
+      "sha256": "46e942ca7d1dde44251ad437219b42ecf4cf6125e9010434c607909a35b9a809",
+      "bytes": 1921,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/include/common/ros2_sport_client.h": {
+      "sha256": "6d72c9b7add1085e09f5f500ded3df2ee370a6031e1ceb817d48b30602179a75",
+      "bytes": 5330,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/include/nlohmann/adl_serializer.hpp": {
+      "sha256": "0c4ce295a3f4092cff092901c340c961b10c48ec8d555110fe3df9f619740a19",
+      "bytes": 2279,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/include/nlohmann/byte_container_with_subtype.hpp": {
+      "sha256": "b56733d3a5b84004f4c7da8ac29ff030509d6a013eeb090541bfcdc46c1a5dc0",
+      "bytes": 3533,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/include/nlohmann/detail/abi_macros.hpp": {
+      "sha256": "702af5c60305125d8e5a4c813d271882b93bb2ba43cdfe91ee4edcef3fbeeb71",
+      "bytes": 3807,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/include/nlohmann/detail/conversions/from_json.hpp": {
+      "sha256": "8cad2ff4a90591110a5cc6134eef25e5a16c33f97b531e1576ed551319d16896",
+      "bytes": 18880,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/include/nlohmann/detail/conversions/to_chars.hpp": {
+      "sha256": "1710dc29a710e8a2121872aefcdd5667c88d3b41b3f863e793a6265106ec237c",
+      "bytes": 38562,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/include/nlohmann/detail/conversions/to_json.hpp": {
+      "sha256": "8d725eca0c56c3f36e64f2d98b701e900d381c6155d0ca98f75ee23173933aef",
+      "bytes": 16274,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/include/nlohmann/detail/exceptions.hpp": {
+      "sha256": "f3621e521c99f4bbfdb0da3aa7b29ff6ceef03163ca62c1ff07efaf06cf1c03c",
+      "bytes": 9268,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/include/nlohmann/detail/hash.hpp": {
+      "sha256": "54f7dd4f4d6cc7bd4c09fec7bda7e47992ee5799bf235104384ee70108023cff",
+      "bytes": 4016,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/include/nlohmann/detail/input/binary_reader.hpp": {
+      "sha256": "2d9cd443303da37c1f5a88b6e1358309c233e54899f82682f33bc6f42c5de97a",
+      "bytes": 103192,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/include/nlohmann/detail/input/input_adapters.hpp": {
+      "sha256": "581e5a0982c01bf63449479547e555101b70641dbfc65c31078e0fc4a4e61671",
+      "bytes": 17372,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/include/nlohmann/detail/input/json_sax.hpp": {
+      "sha256": "be444c45a477d6a26e8bfbb13965e29fc91734a5d06e13b8f34e3b065cf21438",
+      "bytes": 21419,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/include/nlohmann/detail/input/lexer.hpp": {
+      "sha256": "723a7ae568a1460da5235cd1f844db6b12b0f684b5284d5a4c7db4dbe165c980",
+      "bytes": 54544,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/include/nlohmann/detail/input/parser.hpp": {
+      "sha256": "fd687a688fc68835ee1337f4e1e7e935bea6cd17dffabb43399628a69424d669",
+      "bytes": 18722,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/include/nlohmann/detail/input/position_t.hpp": {
+      "sha256": "9007ed8be12f1b0d001c292c1525fdeb1418bed8cd63bf8a00b118574f5bd5d1",
+      "bytes": 958,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/include/nlohmann/detail/iterators/internal_iterator.hpp": {
+      "sha256": "2414d89c20b4eb1278672a21b0f09858c4861ffe878432ec942e23e4d277479a",
+      "bytes": 1071,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/include/nlohmann/detail/iterators/iter_impl.hpp": {
+      "sha256": "68d4b911bfdef6dfb0d14f3c6c58cc7bb1a15f7464dd784ebeb8f753991074b2",
+      "bytes": 24046,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/include/nlohmann/detail/iterators/iteration_proxy.hpp": {
+      "sha256": "5a04f88931571c197aaec348575f42e27007b990e528b8405b6544425ba5a70f",
+      "bytes": 8152,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/include/nlohmann/detail/iterators/iterator_traits.hpp": {
+      "sha256": "78a1c32b2bad6782f97063cf642a6dc02588960b9420c1924ca5ef76fb8df9d8",
+      "bytes": 1757,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/include/nlohmann/detail/iterators/json_reverse_iterator.hpp": {
+      "sha256": "3872b8f61110ff09a77c3a3dca852c0fee9defcaab5b778dc990a253883a5329",
+      "bytes": 3861,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/include/nlohmann/detail/iterators/primitive_iterator.hpp": {
+      "sha256": "274ba54c5c2b2cd8e7c1e635392b09e73fd65d4183571f821ad149b3954ed818",
+      "bytes": 3227,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/include/nlohmann/detail/json_custom_base_class.hpp": {
+      "sha256": "bd8766af0922ce350f00da817c5544b009bd3dbe701d6afd8e5809cedd6e6405",
+      "bytes": 883,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/include/nlohmann/detail/json_pointer.hpp": {
+      "sha256": "89e228596dccae2f4d0f45cfd40097ad29ef2670e8bf461b1a7ee823d5a03834",
+      "bytes": 37143,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/include/nlohmann/detail/json_ref.hpp": {
+      "sha256": "ef04660db0236f2f3341bd36de00cbc3f494018278800294be82f85e1fcc4b7c",
+      "bytes": 1811,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/include/nlohmann/detail/macro_scope.hpp": {
+      "sha256": "586645c0e64aefc9aa6550f26a32938c4e272f5afc6e63de81e09c1723d2d5e6",
+      "bytes": 42976,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/include/nlohmann/detail/macro_unscope.hpp": {
+      "sha256": "65bb2a65eb2935643f5b788efb7b4092f1a329d0b4fbbc9a1b7343775f58797f",
+      "bytes": 1220,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/include/nlohmann/detail/meta/call_std/begin.hpp": {
+      "sha256": "f79ecf122600e2e64f344dd95277910816206e37a80bed18737d22f281dbb465",
+      "bytes": 453,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/include/nlohmann/detail/meta/call_std/end.hpp": {
+      "sha256": "f0d1493594068a73102b52c47f48d3443ea589afbcaaa2672b0e71499f61d696",
+      "bytes": 451,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/include/nlohmann/detail/meta/cpp_future.hpp": {
+      "sha256": "519285d9ceca3d6d3afa0c647c71f8790b91179da66a08b68a9f73a8218016f3",
+      "bytes": 5178,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/include/nlohmann/detail/meta/detected.hpp": {
+      "sha256": "01963ca48427b32286a4bda3741c0817648af65eef673fe7cc9fc9d94cf343a8",
+      "bytes": 2109,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/include/nlohmann/detail/meta/identity_tag.hpp": {
+      "sha256": "9a95aaad68fe15b01570b4f9efaebd1ed2e5ad703767f4b93fc2cd855142199c",
+      "bytes": 526,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/include/nlohmann/detail/meta/is_sax.hpp": {
+      "sha256": "876aaf9f4ccbed679a9340cf51b3dbe38eaf0b18122e0affe0c5e711a2f73533",
+      "bytes": 6960,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/include/nlohmann/detail/meta/std_fs.hpp": {
+      "sha256": "68e8e979cca53bd97bc2e85b9e8a78066b5e791a951b0c73290cd7e5c740bc6a",
+      "bytes": 766,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/include/nlohmann/detail/meta/type_traits.hpp": {
+      "sha256": "b13c458f9cd6a2d8577031f12e11a951e4ae7b508cce64ffadff42f248ad8b4b",
+      "bytes": 28099,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/include/nlohmann/detail/meta/void_t.hpp": {
+      "sha256": "30cf458ad751b37097da34c3e28d9e387bbb37fab29d180984baba4e67d3a831",
+      "bytes": 597,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/include/nlohmann/detail/output/binary_writer.hpp": {
+      "sha256": "fa372506e0779ac7e989c5dcd57b065eb741abc260ededb7ed9fcd848cc6f6ad",
+      "bytes": 71152,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/include/nlohmann/detail/output/output_adapters.hpp": {
+      "sha256": "fec93f451953874aad7a30c79b921cd0c4ade1698e36e964bfe89f1a4a6a3c0f",
+      "bytes": 4067,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/include/nlohmann/detail/output/serializer.hpp": {
+      "sha256": "ede7f1d89e8ba0b2744b5cadd60e99f2e6012abccf1c04aab7356c94a2448fcb",
+      "bytes": 40163,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/include/nlohmann/detail/string_concat.hpp": {
+      "sha256": "9cc995f50f574dab3da7e98aae81ac50c3b0c2ca8eb29f95d2f7172f4865b273",
+      "bytes": 5951,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/include/nlohmann/detail/string_escape.hpp": {
+      "sha256": "16899a2c01c9aee2cd0af5b9ede0d3f579af00b58303197e2692f756310317c9",
+      "bytes": 2168,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/include/nlohmann/detail/value_t.hpp": {
+      "sha256": "f16e2a05c4fdfbe22fc2cee90f7adc0e6ca2c5345348fa1f8c855a8e04f263b6",
+      "bytes": 4326,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/include/nlohmann/json.hpp": {
+      "sha256": "30d91841e7f24bb63fba92165dc389a363b6e18055d7c2749dbf891e986d085c",
+      "bytes": 197070,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/include/nlohmann/json_fwd.hpp": {
+      "sha256": "7f50d7790bcfc96394a6f1a1e6635d4b2c8e08e48081ea2e9129df071cb871ef",
+      "bytes": 2541,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/include/nlohmann/ordered_map.hpp": {
+      "sha256": "117612ea3fca3a4fb6ea2e5b529984c232a4c6deab312a7c7edfe11ff8451534",
+      "bytes": 11692,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/include/nlohmann/thirdparty/hedley/hedley.hpp": {
+      "sha256": "6c5cdf981e43776f4cd320dc7476309efa7332f457288c4f33051b7fa4f7611d",
+      "bytes": 86068,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/include/nlohmann/thirdparty/hedley/hedley_undef.hpp": {
+      "sha256": "2e5aff1a15cbfd8786a2776d0ec0e38e14d2ceadeea229bce5c583bafc26803c",
+      "bytes": 5500,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/package.xml": {
+      "sha256": "4205ec380bcde5c7b5139a9355be9ad6c39a8b741bc2d2ea2843e6afdc210506",
+      "bytes": 775,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/src/common/motor_crc.cpp": {
+      "sha256": "54a7a0ad33499ac49d967435f7090fdcc38753353df1b2d453f473138b6d1b6c",
+      "bytes": 1789,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/src/common/ros2_sport_client.cpp": {
+      "sha256": "79184f467155342015479ed0061366d336fec581d9b7be37ed222aca3045de4c",
+      "bytes": 5111,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/go2_sport_api/src/vel_ctrl_repub.cpp": {
+      "sha256": "c3f29d46362dae64cc6677d7fd364ceafbb5d770ce2606650985921dce56b503",
+      "bytes": 3581,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/unitree_api/CMakeLists.txt": {
+      "sha256": "61029416c795499036c0314866f43a794090fdf24ad3eff5d9cef08ec771fe16",
+      "bytes": 1729,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/unitree_api/msg/Request.msg": {
+      "sha256": "095718e795b7fb08210f32fad9b2ce519ca2b0a0976054e772bc89e48fbe14bc",
+      "bytes": 52,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/unitree_api/msg/RequestHeader.msg": {
+      "sha256": "0783c0fd13fa9cd588bc2cd2b7961c98f1312ab7c1e730d62eae43901c093ab3",
+      "bytes": 64,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/unitree_api/msg/RequestIdentity.msg": {
+      "sha256": "ae144634bbd4b142308d3801fe0fe1712b4fad442fe15cca3552fcce127be2fd",
+      "bytes": 22,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/unitree_api/msg/RequestLease.msg": {
+      "sha256": "b16d384a7334bf5f9d59a90800984ba0e5fdf0b5bed931f2ce11557d0f49f879",
+      "bytes": 8,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/unitree_api/msg/RequestPolicy.msg": {
+      "sha256": "b93c83f07a266ed0de9071be1242d7d7c5cd247a5ec494cfd16720d1a41161ee",
+      "bytes": 27,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/unitree_api/msg/Response.msg": {
+      "sha256": "deeb19c6fec4bf67790d33a9e4a391f717840e274f6882e968d7d65c57402a13",
+      "bytes": 48,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/unitree_api/msg/ResponseHeader.msg": {
+      "sha256": "808649ac643d66fa0620c11cec50d7d8f5cba576094cd50a941093b2f7ac673b",
+      "bytes": 47,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/unitree_api/msg/ResponseStatus.msg": {
+      "sha256": "1102bc217ff8add7007d6bd6ffb6d6f183ee1c9b029d20cd5b09cc7134a6ac41",
+      "bytes": 10,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/unitree_api/package.xml": {
+      "sha256": "bddf9d14c662e67ddd7990b8e100b52e65d62b53d1305319b9fea415aa2a5bbd",
+      "bytes": 857,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/unitree_go/CMakeLists.txt": {
+      "sha256": "520a38ce733da1424c4f5c9765f0af5fd8a7668a708d1b08f56978346d6379ad",
+      "bytes": 2100,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/unitree_go/msg/AudioData.msg": {
+      "sha256": "c875fbedf1b48aa990cbdf061cf2fe406a91152966e155df488d0eb6bbcba9f9",
+      "bytes": 30,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/unitree_go/msg/BmsCmd.msg": {
+      "sha256": "59861adb50b81c76bd1c792e6db604a0cf67e46f781a957bbe422d40e3e60415",
+      "bytes": 26,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/unitree_go/msg/BmsState.msg": {
+      "sha256": "0f7ad8e09f8fd02999da9aa222ab0ecb848d9f70136af78a5ec7a10631959828",
+      "bytes": 137,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/unitree_go/msg/Error.msg": {
+      "sha256": "dcb46b69ed65270bb96c729ad94743b9557d166c048efc5c273eed9cedfa7139",
+      "bytes": 26,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/unitree_go/msg/Go2FrontVideoData.msg": {
+      "sha256": "0cecebd8d40313fee6f8591a7aced7d7f59b9c20e83ed7d4e5509728e26c4ca5",
+      "bytes": 71,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/unitree_go/msg/HeightMap.msg": {
+      "sha256": "e7b732d004e8a482a19ca231ea85095aa3902584a7dc0a849d1cc6fd210ebfdd",
+      "bytes": 654,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/unitree_go/msg/IMUState.msg": {
+      "sha256": "95b5b2aa84fbbea748a560f18cc3950a6091c5822aa1dba326aa183327cb8198",
+      "bytes": 100,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/unitree_go/msg/InterfaceConfig.msg": {
+      "sha256": "03004edb03d062c83309cf233d2135570538b15c1bf837cbf4f1d515766f3695",
+      "bytes": 39,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/unitree_go/msg/LidarState.msg": {
+      "sha256": "cb3dac931714cabba31604f73d1c69eeaf5ae3d1a2d06bac71d68c54d2d6d5e3",
+      "bytes": 396,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/unitree_go/msg/LowCmd.msg": {
+      "sha256": "5254dae41aaee1c32d879affa5b5393e35303f405e68d65e39fd9606497659ee",
+      "bytes": 228,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/unitree_go/msg/LowState.msg": {
+      "sha256": "927537585595e44ab6753741c78410f43c0fe190f3f2f47825fdb57793ed19e5",
+      "bytes": 403,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/unitree_go/msg/MotorCmd.msg": {
+      "sha256": "067edd164076ca83f13b251a152ac4fe15cdec501a08f845a1ca4f0829dd90b1",
+      "bytes": 83,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/unitree_go/msg/MotorState.msg": {
+      "sha256": "e4c7440b1f096b723e48c626c21ef6b77d828d19af0ce5bd90e28a80590014a0",
+      "bytes": 151,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/unitree_go/msg/PathPoint.msg": {
+      "sha256": "f669eeecb1e279267cef687e2b9485a520e7c7a841a8e1f337611304606e457c",
+      "bytes": 87,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/unitree_go/msg/Req.msg": {
+      "sha256": "b356c1bb1e19aa07f6d7fcf38d5e5ea1888f64ecd9f5f28566e71d4aa97e01f9",
+      "bytes": 23,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/unitree_go/msg/Res.msg": {
+      "sha256": "07d84bf89cc9680b066a21f4d0c40833a94b8401cb8ff6df783cd445c88edeef",
+      "bytes": 36,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/unitree_go/msg/SportModeCmd.msg": {
+      "sha256": "21dc358a1d4cf1f4660c9327c2feb9a85ba67139099b1c506d6a4566dc83b2d0",
+      "bytes": 208,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/unitree_go/msg/SportModeState.msg": {
+      "sha256": "4034e8c6805e002c5ad2327912f52219c712853a51a518378acb1d22764d122c",
+      "bytes": 307,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/unitree_go/msg/TimeSpec.msg": {
+      "sha256": "1bab331c842af6a6847f471cf2aad56ad38139c901b9df436470e7b42f86369f",
+      "bytes": 212,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/unitree_go/msg/UwbState.msg": {
+      "sha256": "8813add9680f3c448c4e35d62a49058709f992024867529754d3cd774fd9686b",
+      "bytes": 307,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/unitree_go/msg/UwbSwitch.msg": {
+      "sha256": "4aa32edaaa274891d5997de5355e000a0dcdd51d7c0702f7b25bbde0b7492dc4",
+      "bytes": 13,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/unitree_go/msg/WirelessController.msg": {
+      "sha256": "ce175fee57fa89c6edfd0d57e8395e5b75788b62ad6d19a393dc68e0f2fddd6d",
+      "bytes": 55,
+      "mode": "644"
+    },
+    "ros2_ws/src/unitree_pkgs/unitree_go/package.xml": {
+      "sha256": "9d2cc324ad62529960ff6926033cb70f8543ccafd57d3cfce3dc825113be4d4c",
+      "bytes": 856,
+      "mode": "644"
+    },
+    "ros2_ws/tools/cloud_stats.py": {
+      "sha256": "13854fa02ecaf12065246f7c13a0b8701c83449873c78215b2a41cc4c434f90b",
+      "bytes": 2491,
+      "mode": "644"
+    },
+    "ros2_ws/tools/grid_stats.py": {
+      "sha256": "49ab1df2b312d2c821bcd44581af0ef2f2b22f1ea480d617472c60929815e439",
+      "bytes": 2378,
+      "mode": "644"
+    },
+    "ros2_ws/tools/hap_pc2_timing_stats.py": {
+      "sha256": "ea4d495d298e154198d20213808199aa21a2131bbde11f0a7f4a944b7f11077a",
+      "bytes": 3004,
+      "mode": "644"
+    },
+    "ros2_ws/tools/hap_static_match_check.py": {
+      "sha256": "35dfb03470521e2267f4ebc2d40d457f04f4e6d6dbb2e53a6e3cb4432c045116",
+      "bytes": 3456,
+      "mode": "644"
+    },
+    "ros2_ws/tools/livox_timing_stats.py": {
+      "sha256": "1164d9c17ace8ca4944ceba7906513a2ffa21bc19ffd91022a4fe5ad2eecdb04",
+      "bytes": 3035,
+      "mode": "644"
+    },
+    "ros2_ws/tools/odom_static_stats.py": {
+      "sha256": "772caeaad8465dd594fb4bdaba3d5caec314a977ae18b73c4e05225011cccbfb",
+      "bytes": 2871,
+      "mode": "644"
+    },
+    "scripts/benchmark_topics.sh": {
+      "sha256": "bd6f6cf0944a6d4d3ccaa6980dc568ca507619f642648c06dfd85c76a87f6bcb",
+      "bytes": 1491,
+      "mode": "644"
+    },
+    "scripts/build.sh": {
+      "sha256": "08327c71472ce876f7184f17a9ba671461fdbba5d5b79304fba1aed610dbca34",
+      "bytes": 487,
+      "mode": "644"
+    },
+    "scripts/build_livox_sdk.sh": {
+      "sha256": "902ca134be96b919afd22313cc4a0145f13af6708bc5d751f1fc1efa0fac3064",
+      "bytes": 515,
+      "mode": "644"
+    },
+    "scripts/build_navigation_fluency.sh": {
+      "sha256": "02cb8595acd1066e99d7a8840ccba0b19fb3aef90f5fc1e2fe149f10fce9f0c8",
+      "bytes": 1016,
+      "mode": "755"
+    },
+    "scripts/check_front_obstacle.py": {
+      "sha256": "a2f491cab333107ac4cffdb0fa744ca2ebced7e912bc558a63387b2eb4a051db",
+      "bytes": 7924,
+      "mode": "644"
+    },
+    "scripts/check_local_dds_continuity.py": {
+      "sha256": "ea144ca37c6154a0a801032a3032d25a921e650993047e508c9776fd7ae7b0f3",
+      "bytes": 2896,
+      "mode": "644"
+    },
+    "scripts/check_navigation_fluency.sh": {
+      "sha256": "f080a6f8db684ae87e837968e0d0772d20d1a187e7986fcb17ac355fddd5e020",
+      "bytes": 1169,
+      "mode": "755"
+    },
+    "scripts/check_navigation_regressions.sh": {
+      "sha256": "a4c396baef67a00c1c96083eb391169e09fb3b9fd7776abf8d7fd25547737bb1",
+      "bytes": 4639,
+      "mode": "644"
+    },
+    "scripts/check_navigation_runtime.py": {
+      "sha256": "90e9ca4a546fc9c0ef30e6ab54ad1905bbae142198b056eaeac5bea6aa009d34",
+      "bytes": 15157,
+      "mode": "644"
+    },
+    "scripts/check_navigation_stance.py": {
+      "sha256": "6a0f5a5317be7586428d562222d76056d1d102c70b1c97102e9d2d07d7b357cf",
+      "bytes": 2837,
+      "mode": "644"
+    },
+    "scripts/check_near_lidar.py": {
+      "sha256": "9d16d2e2b9950bb606d550593bcec8a363e4c64f38d53dac79890c630234e61d",
+      "bytes": 12963,
+      "mode": "644"
+    },
+    "scripts/check_system.sh": {
+      "sha256": "04eeb43a6a30ed2b291eb8bfe410727abe2346b32087bb5814193afc5425a23f",
+      "bytes": 4068,
+      "mode": "644"
+    },
+    "scripts/env.sh": {
+      "sha256": "baea1c4d8af25f835923d148b97a8ae1770d483c6f20a6ceb78e6de3043e63c4",
+      "bytes": 4631,
+      "mode": "644"
+    },
+    "scripts/inspect_navigation_grid.py": {
+      "sha256": "9780763f4480290b3a348e76cf38d1ead42d265bd516752eade7fd8691b85493",
+      "bytes": 2433,
+      "mode": "644"
+    },
+    "scripts/inspect_navigation_layers.py": {
+      "sha256": "7f09685dd4ff30a0027efc701d009232f781cdb56e9cb71f8ebcbca1a6242ec4",
+      "bytes": 5007,
+      "mode": "644"
+    },
+    "scripts/inspect_obstacle_cloud.py": {
+      "sha256": "63a25ecaddb7de036a995acac7b02177fd8fdbb48a3eb3a5bbafb587ca3e129a",
+      "bytes": 2768,
+      "mode": "644"
+    },
+    "scripts/install_dependencies.sh": {
+      "sha256": "a90b2811bd8060c62ce13a757f76f8bfd1c79de69a38156de5ac35a4304549e4",
+      "bytes": 2734,
+      "mode": "644"
+    },
+    "scripts/install_interaction_dependencies.sh": {
+      "sha256": "1ea4f3edae041472c55462cc1a293be37b71658d57f78e9a13ca8ff0827f3e85",
+      "bytes": 3334,
+      "mode": "755"
+    },
+    "scripts/prepare_audio.sh": {
+      "sha256": "ba1e4467782cc37e75bf8fc9b9010ac7d27b74e60694c57124c7fe4e5a3f7caf",
+      "bytes": 2813,
+      "mode": "755"
+    },
+    "scripts/process_supervisor.py": {
+      "sha256": "0e9fb62892ebe3779fca61f7e91a69796ecf7f795e90e9c91d39b0f930fa6f78",
+      "bytes": 2859,
+      "mode": "644"
+    },
+    "scripts/record_navigation_trial.py": {
+      "sha256": "1ff2f6ba25bc5ad18ad748e339d3f776a188ba1727ac07d26a8fc0539ab043e8",
+      "bytes": 10001,
+      "mode": "644"
+    },
+    "scripts/reload_lio_navigation.py": {
+      "sha256": "2c2f5eb4519e2a23963cbd6e6946bb3435dbaec15656dab0e9e8663fc9ab6f9d",
+      "bytes": 20620,
+      "mode": "644"
+    },
+    "scripts/reload_obstacle_memory.py": {
+      "sha256": "ff710cc93dc6ab50892a0b6b93246a9c13effb1976b93b5e2316a5e249b111cd",
+      "bytes": 14420,
+      "mode": "644"
+    },
+    "scripts/run_lio_navigation.sh": {
+      "sha256": "98c87882c3bbf0f80a7bd90718f81131cb286841c4d18d76c3f23f066f27a986",
+      "bytes": 1579,
+      "mode": "755"
+    },
+    "scripts/run_mapping.sh": {
+      "sha256": "fab3031153d0b51706185064b2d6bdb13a15dfe703c36aad23b3f93406d74529",
+      "bytes": 429,
+      "mode": "644"
+    },
+    "scripts/run_mapping_F.sh": {
+      "sha256": "d69025da335cf719e32c632ef573861e5fac670a0eed7f9f5ed1fd0836f35bc7",
+      "bytes": 453,
+      "mode": "755"
+    },
+    "scripts/run_navigation.sh": {
+      "sha256": "c2349583769ad05aa722832f302825e1dc9fd49a81666a1809bc07dd3cade01a",
+      "bytes": 472,
+      "mode": "644"
+    },
+    "scripts/run_ui.sh": {
+      "sha256": "90d68436ed840dbecbff93410710c72ca8700858a675106874dd7d59700e9a14",
+      "bytes": 1156,
+      "mode": "644"
+    },
+    "scripts/save_environment_map.sh": {
+      "sha256": "a6163365c03f69e11d1603861e8aadd26f1c52d22fabd954ae475a959b41f88e",
+      "bytes": 192,
+      "mode": "644"
+    },
+    "scripts/start_obstacle_memory.py": {
+      "sha256": "d8ba71a43f378fd4aa726b75b06e5e2fc775871eec6ab31380b48a38a4464c2f",
+      "bytes": 3077,
+      "mode": "644"
+    },
+    "scripts/test_process_supervision.py": {
+      "sha256": "2eb6de3418db38ab792f2642af8c320cec1838985c4a991da76b2215b17ba881",
+      "bytes": 2473,
+      "mode": "644"
+    },
+    "scripts/tigervnc/README.md": {
+      "sha256": "e1f6e9703a6f6ecf584fe70e7ca3bdbfe32b2edc559226d6e589aecaa1b3101c",
+      "bytes": 2821,
+      "mode": "644"
+    },
+    "scripts/tigervnc/console.py": {
+      "sha256": "758b36a25930afe69995ae06ee623b77af3f539e95fd86da0427d89c2db3a1bb",
+      "bytes": 7306,
+      "mode": "644"
+    },
+    "scripts/tigervnc/install.sh": {
+      "sha256": "a7dcfd196574ba6cdc5c082b16f914ebe0e7d8e6175a504c0f32c8690be5dd19",
+      "bytes": 1745,
+      "mode": "644"
+    },
+    "scripts/tigervnc/stabilize-wifi.sh": {
+      "sha256": "87661b655e5adb917d3d0dbd380e044f5417f75457ac4e1d651b7ef53d6ad5ba",
+      "bytes": 1825,
+      "mode": "644"
+    },
+    "scripts/tigervnc/tigervnc-console.service": {
+      "sha256": "077cac823c15a85d82ecf588b712f788b4dcb8f4a4db7f16c7d9248e6159f012",
+      "bytes": 585,
+      "mode": "644"
+    },
+    "scripts/tigervnc/wifi-powersave-dispatcher.sh": {
+      "sha256": "d2c78eaa3578c912b25adeedc7718cbaf438f7cd9967ed69a9a89806925b0441",
+      "bytes": 394,
+      "mode": "644"
+    },
+    "test/test_navigation_stance.py": {
+      "sha256": "91a32e4e7697f5d202c8dbf874786384f3e764f827cb4fa775c3f92be844423e",
+      "bytes": 1917,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/3rdparty/FastCRC/FastCRC.h": {
+      "sha256": "8a33e872e2a1426f6f3d69bb2c2872ee3402c70d8c6b1394f2c093f8ecc55c22",
+      "bytes": 7415,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/3rdparty/FastCRC/FastCRC_tables.h": {
+      "sha256": "54cc42cdc240e84347d07e61af83c6bed38c7ceac2f15a4847cfa11e509bfbac",
+      "bytes": 88526,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/3rdparty/FastCRC/FastCRChw.cpp": {
+      "sha256": "1eab1fe68bf64cf937759e81c4ae69c2f1a929769a6651b595658e3e9af49117",
+      "bytes": 16870,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/3rdparty/FastCRC/FastCRCsw.cpp": {
+      "sha256": "7fe0edc04442a29a0b076b4d09c7b250d2c4f89bba1bfa6a43f2493d33524937",
+      "bytes": 13727,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/3rdparty/FastCRC/LICENSE.md": {
+      "sha256": "2cdf510c5ad25585baf540ce3867879baaa80238c0bb29cdbe661435e6ea1c3d",
+      "bytes": 1071,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/3rdparty/FastCRC/README.md": {
+      "sha256": "a05479bb2028ad8d4e664295a5aec7ab78a6c3aa3292a461800c6f3a7fdbaf13",
+      "bytes": 1546,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/3rdparty/rapidjson/allocators.h": {
+      "sha256": "49b554ebfc2369438fd9365b28f0453485d936437847de31a7bb770001abca55",
+      "bytes": 10437,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/3rdparty/rapidjson/cursorstreamwrapper.h": {
+      "sha256": "de1a52b674c998a7581f9cb69c9310757f825595c3fef985d5d153f7ac1b6aaf",
+      "bytes": 2230,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/3rdparty/rapidjson/document.h": {
+      "sha256": "6afae6a8825b03b4c6baa42a513e5a5242ac96b4c95968c07ee8bda8163eb3ff",
+      "bytes": 117966,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/3rdparty/rapidjson/encodedstream.h": {
+      "sha256": "4bb5e4853943d5ead467e46b5313d95aa23645018cda93e7907a934a06cfbb26",
+      "bytes": 10634,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/3rdparty/rapidjson/encodings.h": {
+      "sha256": "0201c664e471c615b5cd27d2e981cf8b21ac9c210bdf108062fb2fd9d493a501",
+      "bytes": 29827,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/3rdparty/rapidjson/error/en.h": {
+      "sha256": "484dcd32c0b35b7a81561740fad970402c0ffcec44311381a2fb265cfe5e273c",
+      "bytes": 3739,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/3rdparty/rapidjson/error/error.h": {
+      "sha256": "aa9b40b61754b227248b4b092331dbd5721ef6565d962e4c225c6c1e7974817e",
+      "bytes": 6472,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/3rdparty/rapidjson/filereadstream.h": {
+      "sha256": "8c7d282eb32897969430f5a94178cab238433e25fa139ee74eda87eb1d42690a",
+      "bytes": 2961,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/3rdparty/rapidjson/filewritestream.h": {
+      "sha256": "1db49a4cd9038f2670667e5900f346d231a0eece06ac1817f33feb63f33545b9",
+      "bytes": 3073,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/3rdparty/rapidjson/fwd.h": {
+      "sha256": "2a0e024b8b6b87d1d3f50d1d0dd4656124c161fea88406265d097d613498854e",
+      "bytes": 4120,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/3rdparty/rapidjson/internal/biginteger.h": {
+      "sha256": "0be8375c2d39bc1f8f57b755a26569db9ed35c86d066b294911690513786afb3",
+      "bytes": 8296,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/3rdparty/rapidjson/internal/clzll.h": {
+      "sha256": "93d71c879a805a8c17cfd8913cf1add4d2f25407bbf668abe1dcca6e40ebc746",
+      "bytes": 2035,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/3rdparty/rapidjson/internal/diyfp.h": {
+      "sha256": "f2c45af9e73a451e5472e5dd10a7672085e9a3504d1f3ab864a5b9cc7445c1eb",
+      "bytes": 11387,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/3rdparty/rapidjson/internal/dtoa.h": {
+      "sha256": "965deca8d1382c30db9e0a1d51200a4934bfe032eda3dcde10d4bdb39817c05a",
+      "bytes": 7724,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/3rdparty/rapidjson/internal/ieee754.h": {
+      "sha256": "a1b4a88d5e0f633e99c7d68a34fdebc6289e6be0f0cfba452a7793166d7ea970",
+      "bytes": 2990,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/3rdparty/rapidjson/internal/itoa.h": {
+      "sha256": "45c96bab2327aee5ff999167fac8f768a3a9e1003142fa68e3aee50b54d93e12",
+      "bytes": 9272,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/3rdparty/rapidjson/internal/meta.h": {
+      "sha256": "a20dad578c7d714ff04029f04719df19be5835c30bf9c7028d226e67d065bf0b",
+      "bytes": 6731,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/3rdparty/rapidjson/internal/pow10.h": {
+      "sha256": "7a7693969c936ddb6d036467a0f6b53def076922bb838d250eb40f12b2e2ce0e",
+      "bytes": 3957,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/3rdparty/rapidjson/internal/regex.h": {
+      "sha256": "624cf078b8179a198374eebe94331aa2d8b70b08997f4e270ccfaccc90fd09b2",
+      "bytes": 23238,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/3rdparty/rapidjson/internal/stack.h": {
+      "sha256": "46c4f98ff2acce64d1280458dd1224aaee9a9035eebd3462cdf31ee25a13702e",
+      "bytes": 6805,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/3rdparty/rapidjson/internal/strfunc.h": {
+      "sha256": "e083b68f7bf3570653fce1e3ea0a573a75745a096dd80194e1a2fde4d7695bb8",
+      "bytes": 2184,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/3rdparty/rapidjson/internal/strtod.h": {
+      "sha256": "2134c15ad40b9584ecb8e1a7f6163277a6d783574b3fb08574f88ab769b91751",
+      "bytes": 8656,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/3rdparty/rapidjson/internal/swap.h": {
+      "sha256": "48ecb57c3b2ca955ad3cccdfff03835be495a56c9c5da07ab9c02f488b7d7fe1",
+      "bytes": 1421,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/3rdparty/rapidjson/istreamwrapper.h": {
+      "sha256": "b3c03a5826b8d8c9dfcef64eb09d8ec4a955e0c6edd38d9c3a127dbca53ec2dc",
+      "bytes": 4112,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/3rdparty/rapidjson/license.txt": {
+      "sha256": "a140e5d46fe734a1c78f1a3c3ef207871dd75648be71fdda8e309b23ab8b1f32",
+      "bytes": 5152,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/3rdparty/rapidjson/memorybuffer.h": {
+      "sha256": "cf661606aa41bee3466cee20174bc7454210e8aabac929b1d8e9e189fef601ab",
+      "bytes": 2573,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/3rdparty/rapidjson/memorystream.h": {
+      "sha256": "8dd07eb66381de95a69c9cadce537d76c0349f913cfe183ab6243c54863c4dcf",
+      "bytes": 2673,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/3rdparty/rapidjson/msinttypes/inttypes.h": {
+      "sha256": "92f53d3ba0cdebaeb20a52893f89d0c29aae5111a3a8bb555eabdd8c96e3244f",
+      "bytes": 7824,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/3rdparty/rapidjson/msinttypes/stdint.h": {
+      "sha256": "515ff5e244372892293c20bbfe6a5b3dcca7265442941df31dcebdfbe2a828fe",
+      "bytes": 9151,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/3rdparty/rapidjson/ostreamwrapper.h": {
+      "sha256": "366d953184777b0de0a102ef38cf56f9fc766422246f16be9af2dad8ad787054",
+      "bytes": 2342,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/3rdparty/rapidjson/pointer.h": {
+      "sha256": "d74ab63c76a99a5a92418d2420cc733c22767b6d9e9a6f989689940de4f7c478",
+      "bytes": 60230,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/3rdparty/rapidjson/prettywriter.h": {
+      "sha256": "e8495e521c5d726c7e2ff59b1f7eb6f08a1e0298055d1fbbc4f29f08d736360d",
+      "bytes": 10253,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/3rdparty/rapidjson/rapidjson.h": {
+      "sha256": "22ffbcb054cecc5180bdb72478ab32598c9aa40421322f17923809acdcf99629",
+      "bytes": 24293,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/3rdparty/rapidjson/reader.h": {
+      "sha256": "291f6d315a3617c9bd83d8b2836f9dc1e45a2a9770dcb0745f9eaaa603b715a6",
+      "bytes": 89290,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/3rdparty/rapidjson/schema.h": {
+      "sha256": "473b44fcb9f88d2fa7439e1c9f86899deae44205323a7ba7709e6b4b513f01fa",
+      "bytes": 101259,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/3rdparty/rapidjson/stream.h": {
+      "sha256": "58e37336dafded31177eb2381f0d553de8a5fd33c8580873de32b0e467d85677",
+      "bytes": 6694,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/3rdparty/rapidjson/stringbuffer.h": {
+      "sha256": "8434f52ca786bf876b3d3d693ce8e2d399325ddf891e0437becd41ed590806e9",
+      "bytes": 3984,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/3rdparty/rapidjson/writer.h": {
+      "sha256": "b42eca28a42d7b3806aaf691ee921accabcf911be6728c35fa04e14162a72bdf",
+      "bytes": 26178,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/CHANGELOG.md": {
+      "sha256": "a103236d39eaa273852ddb7b595e1e5a50e8496c8d5ece71962037351263f13e",
+      "bytes": 1521,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/CMakeLists.txt": {
+      "sha256": "dc4304689e3f51fe6e32c56914b15f8299cf5931c67208cd8afc5846756b50f3",
+      "bytes": 387,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/LICENSE.txt": {
+      "sha256": "8a71b3149554ec5b7df17087e63affedc4c0dbc7fb65bfe5495cdf86224fa85f",
+      "bytes": 13252,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/LOCAL_CHANGES.md": {
+      "sha256": "197217d3d276d4676321b78d698551e4fee2f541c47db08fc72fb8c2bd883f5f",
+      "bytes": 1277,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/README.md": {
+      "sha256": "0c9750c8e0333b61c089afe177705a7f4f21074b0c967e2db8e278ba6fecd794",
+      "bytes": 10679,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/include/livox_lidar_api.h": {
+      "sha256": "c9b40b4336a0d8732d05a9e84869342519577c6bb9f08c77330a30655b9bbfed",
+      "bytes": 27048,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/include/livox_lidar_cfg.h": {
+      "sha256": "fbeb3b91897fad5b71b169e4e4f88bfb3b4b716cecb07e45aa08569cf159e9a5",
+      "bytes": 1731,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/include/livox_lidar_def.h": {
+      "sha256": "85306714bbba536cb613143dc70107731acceba1b52b827a92b34eeaa8562847",
+      "bytes": 22449,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/CMakeLists.txt": {
+      "sha256": "1cd5ac0d9faf97c49d1beaf7a955417ec539c3437e18c25b54c35ce3408a7fb3",
+      "bytes": 4811,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/base/command_callback.h": {
+      "sha256": "11ea39c0df2a1c1fcd55e71e7fdfc3e73df9ecdd5d4c38b7795d86ae935f45bc",
+      "bytes": 7515,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/base/io_loop.cpp": {
+      "sha256": "51acbb82696af042f1df0dd35deab6638078a3728b23cde0d34bacc1b63457b4",
+      "bytes": 3449,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/base/io_loop.h": {
+      "sha256": "d589b5c511414ad085a314f5ac6f340d68485e4c9b6ef8741f286d6787f9bb17",
+      "bytes": 2670,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/base/io_thread.cpp": {
+      "sha256": "ccca2b4e207361b25c0d23f7d0436c21fe228cc17056ad6ffd8ba2a389673f52",
+      "bytes": 1641,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/base/io_thread.h": {
+      "sha256": "dc2f129b486f95b1e7ca8dcb2fd3dd40f53b65a7140154674787d66f6e3595f4",
+      "bytes": 1693,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/base/logging.cpp": {
+      "sha256": "046b55867a7ceb4518e5a745d3777bc34f14442feaa5bd1284bab7196154ce58",
+      "bytes": 2158,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/base/logging.h": {
+      "sha256": "d2a8c658e06a9531c8d9aa261579bdc44efde977924d3759f0c195ff3a5d6339",
+      "bytes": 2468,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/base/multiple_io/multiple_io_base.cpp": {
+      "sha256": "047678daec2fc09c9090d916cdbd7207e7f808ce7d952e4519c469c044b7bd39",
+      "bytes": 2634,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/base/multiple_io/multiple_io_base.h": {
+      "sha256": "0ddd32c039d5f99d4d2bb7715a4a857b92dd76b2a2b44e3b8015898f0babf15d",
+      "bytes": 2701,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/base/multiple_io/multiple_io_epoll.cpp": {
+      "sha256": "a3aa786e33be4f4830994f30d97e405aba6b12db26a77aac5ee5ea28d54a52f4",
+      "bytes": 3119,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/base/multiple_io/multiple_io_epoll.h": {
+      "sha256": "19b867eed1a4b7f387878c56c42cdc334ea6ac7e1e8aafb81a35862b8e953263",
+      "bytes": 1770,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/base/multiple_io/multiple_io_factory.h": {
+      "sha256": "6b821852ea5ca0ba7ea12176da702bd5ad2e5b450275e236ae42510bef3dc277",
+      "bytes": 2021,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/base/multiple_io/multiple_io_kqueue.cpp": {
+      "sha256": "3fc579c9ae20a547eed5e6b2d26c975d03eb3f9031f2523f21d14711d2a39004",
+      "bytes": 4146,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/base/multiple_io/multiple_io_kqueue.h": {
+      "sha256": "294f80e0108191f2adf6914f7f7ef2bb3280df093971f71dce2eccd4c45524e0",
+      "bytes": 1806,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/base/multiple_io/multiple_io_poll.cpp": {
+      "sha256": "1d3f75e8fd1ff5332e8b9c631155960c7f85fff73cf8606d8c599c71b8dd339c",
+      "bytes": 3129,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/base/multiple_io/multiple_io_poll.h": {
+      "sha256": "4d1260881bcb88f0f5d9ba7b3a74ba527b1381163eaa0db6ef4d037e6f9dd045",
+      "bytes": 1761,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/base/multiple_io/multiple_io_select.cpp": {
+      "sha256": "45e8e7708c9f16591e62435dcd3261f0757e710de0e3f9ef480666fed73acc6c",
+      "bytes": 3275,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/base/multiple_io/multiple_io_select.h": {
+      "sha256": "d65c2279429afe5341a7f7ebfd25618c84d60491934a5b91301b15daf18861e4",
+      "bytes": 1734,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/base/network/network_util.h": {
+      "sha256": "415701f2c7c414ae7552136421d92f635ddd6817cf489e3de96c21b775b780c8",
+      "bytes": 2178,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/base/network/unix/network_util.cpp": {
+      "sha256": "0627dff0662394da7b2f839b9aa649114d950aac1bd2c75049ebb94e96d4fc3e",
+      "bytes": 6139,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/base/network/win/network_util.cpp": {
+      "sha256": "869c288ee43fe73548d812516140fc02d729bc20811df89a240a7e82783bd331",
+      "bytes": 5662,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/base/noncopyable.h": {
+      "sha256": "0735ef6902571ec9ad6421d81ad9a4bc00b78f0824171a5787e308602c4bb4a3",
+      "bytes": 1500,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/base/thread_base.cpp": {
+      "sha256": "93b8b2c613a6df84e52395ff5785dfa9e67ce5b40cf4085c576b0971805e5bca",
+      "bytes": 1839,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/base/thread_base.h": {
+      "sha256": "4ea799e351d9ac4db9f393fd4a8cfa75986226b2f5167315d4c6be854a6a21d1",
+      "bytes": 1694,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/base/wake_up/unix/wake_up_pipe.cpp": {
+      "sha256": "fd98af5806f5dcb77418d0c89ab67017999ed1551fab6160df071e6d8d28bbe1",
+      "bytes": 2768,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/base/wake_up/wake_up_pipe.h": {
+      "sha256": "9ebc0266829f033c3ce52ff51cc8811a02a6f8c1fe7b444ca2662aedd2910e75",
+      "bytes": 1581,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/base/wake_up/win/wake_up_pipe.cpp": {
+      "sha256": "a13434ea5a9f466bc207ad9d253f389427e7d8d0ea1bb2ed477911e1412d4ac5",
+      "bytes": 3631,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/comm/comm_port.cpp": {
+      "sha256": "5cd600de3810030216da6313c399ef114386b98bd40020138a13004fa52a1d3f",
+      "bytes": 1926,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/comm/comm_port.h": {
+      "sha256": "1d27321f1a975779a479827d1f0162638a47dfe5dbc7201d68a806d0a5f8053b",
+      "bytes": 1671,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/comm/define.h": {
+      "sha256": "74de25c7f8e80c2b69bf07aff0e1acfb2318c23bca669bb7c883a124565b0e5f",
+      "bytes": 12297,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/comm/generate_seq.cpp": {
+      "sha256": "5da24cfef577446f257358cd800cac96af5b415e0db37ca4f0e73f22f80610e1",
+      "bytes": 1599,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/comm/generate_seq.h": {
+      "sha256": "53e0af4907e9939e29e8f577dc20776fa19d8b095e8aa28f0826dfd3db736e32",
+      "bytes": 1448,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/comm/protocol.h": {
+      "sha256": "342e11184d7c775d2cd178cf605586427d13a1fcd9cd9437211dbec61f8a09dd",
+      "bytes": 2667,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/comm/sdk_protocol.cpp": {
+      "sha256": "f863c28d96588afbf870c80702bc43e7f7c77fd41c5dcd3c99f48ea46a7f46e7",
+      "bytes": 4109,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/comm/sdk_protocol.h": {
+      "sha256": "4cf4e4818a9e3541a2839eb40f0c167bd57257ab759f5a030c4f165679b816fd",
+      "bytes": 2447,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/command_handler/avia2_command_handler.cpp": {
+      "sha256": "ce0484834fa64f68e1cc464c83b7c8645c1df594cadd34f12b09051a8c8a35a0",
+      "bytes": 10381,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/command_handler/avia2_command_handler.h": {
+      "sha256": "33302dc686435fb867f0a5e7d21dbf8192f1ba5e43d86f5ed26b0f3ab4f68415",
+      "bytes": 3401,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/command_handler/build_request.cpp": {
+      "sha256": "41d6f37985f3ada546264bb80c9fb56d1e40ab2e3e8dab8123c08fc15c06ac61",
+      "bytes": 23699,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/command_handler/build_request.h": {
+      "sha256": "d709fa6d0cd52e755b2a53a24e403bd07837f34c4e93b58f6e6160eaefad0f0a",
+      "bytes": 3266,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/command_handler/command_handler.h": {
+      "sha256": "45188ace6b6aad784b52fbdef0e5dde10bd3fc338f4d33f8cb7aebfce2554abe",
+      "bytes": 2265,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/command_handler/command_impl.cpp": {
+      "sha256": "948bcc1720b5e9e3807d34c3948f9343c7a7126e593ca514bda9e4db35a52195",
+      "bytes": 43158,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/command_handler/command_impl.h": {
+      "sha256": "8ae25e1c8b46f1e1769776e34b895128206704bc27dca2468dd24e8cd93dbec5",
+      "bytes": 9109,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/command_handler/general_command_handler.cpp": {
+      "sha256": "3434889cb18f388a2a191955b5b2f7d0510ff788d3bec20f40c987856e753b24",
+      "bytes": 29878,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/command_handler/general_command_handler.h": {
+      "sha256": "b8691365d81e2e2821abe471615415e3cf4bbfb6d2862ee2c31e432c78e3d16a",
+      "bytes": 6029,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/command_handler/hap_command_handler.cpp": {
+      "sha256": "00758c6d123129e17a72f540e4e52698d0dc27350eeb87eaffe93a1782320173",
+      "bytes": 10813,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/command_handler/hap_command_handler.h": {
+      "sha256": "2468ee96a29765a1f0dda72f321615ed38953ec70a2e1e114c047a1d3c3f90b1",
+      "bytes": 3424,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/command_handler/mid360_command_handler.cpp": {
+      "sha256": "d925eef3b52e850343fd91ddb56fe6a38ebfbf476e9d6771578dafb91b7e6169",
+      "bytes": 10412,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/command_handler/mid360_command_handler.h": {
+      "sha256": "a575869b71c9ac79da402d8061fdfca4fe977858c077d777cb49105bf04bbb59",
+      "bytes": 3407,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/command_handler/mid360s_command_handler.cpp": {
+      "sha256": "c948e0708f0129b20f255b105566f42591a979fe3df0e045b0be1354f62b0a54",
+      "bytes": 10442,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/command_handler/mid360s_command_handler.h": {
+      "sha256": "7ab741996aa11b1842b6f90a176790600485bc0fa106d2be5bf43b52aa04f9fa",
+      "bytes": 3413,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/command_handler/parse_lidar_state_info.cpp": {
+      "sha256": "63642032d9c0551c95921a1a17749ce21bde45dbf78719c3cc6bf13166ff23e9",
+      "bytes": 28949,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/command_handler/parse_lidar_state_info.h": {
+      "sha256": "2301e1d8e15a448e2d6029d7077f5780f571c180633674a8481daa97ac654d9f",
+      "bytes": 2537,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/data_handler/data_handler.cpp": {
+      "sha256": "d4d59a0454c77c2c4f5702d96874b6c1f250516169cafc28d70286f37db45d62",
+      "bytes": 3936,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/data_handler/data_handler.h": {
+      "sha256": "9498f0ee4c4ca979b55ef3878a9a41273f7a7d583edab5b16cc833951421e57c",
+      "bytes": 2410,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/debug_point_cloud_handler/debug_point_cloud_handler.cpp": {
+      "sha256": "12e38d040c61a4a5f18cc7847dbc9dcd6641e9cec638732ee19f66097bb656c0",
+      "bytes": 4876,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/debug_point_cloud_handler/debug_point_cloud_handler.h": {
+      "sha256": "c900702b269fa603553badc91a6ba1147ec71783d873dbd3d29d6c785548cd4d",
+      "bytes": 2454,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/debug_point_cloud_handler/debug_point_cloud_manager.cpp": {
+      "sha256": "40c7d5cb536da85dfe1ec7adbecf1b4d794f32e16238b33707a60a7fe886824a",
+      "bytes": 1998,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/debug_point_cloud_handler/debug_point_cloud_manager.h": {
+      "sha256": "e55e23eb40c4db42ad1743650b8ac6af31e9c552a5db43cb57f234fb8eac728a",
+      "bytes": 2406,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/device_manager.cpp": {
+      "sha256": "017fc1fa15ae4f40ce238f9ddd04169bfd66f6100620f648322c472f871e66e0",
+      "bytes": 31347,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/device_manager.h": {
+      "sha256": "78c97876a8c1faa093314fd0c27b57f71884247f2bc7aa079b0b54005c880c3e",
+      "bytes": 7054,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/livox_lidar_sdk.cpp": {
+      "sha256": "5b3fcf8b8334ba048091d7a0043a3e6600851d406fb8d5e903c24ff20dee664d",
+      "bytes": 15488,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/logger_handler/file_manager.cpp": {
+      "sha256": "5062c984f8a54e685571b685b4169e26c6da7015954f2aaf9052195405e6e00c",
+      "bytes": 11084,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/logger_handler/file_manager.h": {
+      "sha256": "cbcff5d55586ef2a91022575d6c51b6784922546c11e0ad499c73fa550b3ca98",
+      "bytes": 1916,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/logger_handler/logger_handler.cpp": {
+      "sha256": "787a0407c8dd9fe3408292e4d16a91fdfb55bd948ad8ce464a92717fc09db844",
+      "bytes": 7776,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/logger_handler/logger_handler.h": {
+      "sha256": "81aeaaa9892c10d9f17aad341f1bc13a21d2527648bb279ab6459f04105697e7",
+      "bytes": 2920,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/logger_handler/logger_manager.cpp": {
+      "sha256": "27cc4185a55cf39841847b4253fdb12ea22b6b69a74aee90987a6ab796dab481",
+      "bytes": 13539,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/logger_handler/logger_manager.h": {
+      "sha256": "e029b74d199a4fa5351614656e9204a994d89c63ac4a8592c06cccae837f0d26",
+      "bytes": 3985,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/params_check.cpp": {
+      "sha256": "adce8d4103a5da1f07da56e5ab199b91faca1e16a2b13c4f8dfffd0db8d9bc55",
+      "bytes": 7894,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/params_check.h": {
+      "sha256": "1664f63068ca0ebc278ae94a7d012df19c265ff0a68f3b28e0566027950610c2",
+      "bytes": 2020,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/parse_cfg_file.cpp": {
+      "sha256": "94f3a133d67741e363bcc450cd19024e3233065e06ee6c86205a9769fb977da0",
+      "bytes": 15345,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/parse_cfg_file.h": {
+      "sha256": "ba77ab667b983b71ad4dc8e1d37e3cfdc3904f35f61f6f3baf381b40da65394e",
+      "bytes": 3222,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/upgrade/firmware.cpp": {
+      "sha256": "42e66a98f29926ebe35035e3b546105e0207457f65f452fb1e771091f97eaaee",
+      "bytes": 3086,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/upgrade/firmware.h": {
+      "sha256": "2c4084706a8824cc5c010aca2d7ba56943f76ce16f42c27157ea96d3b08711f4",
+      "bytes": 3954,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/upgrade/livox_lidar_upgrader.cpp": {
+      "sha256": "264b01eddf13ea5b5fc770eb539cea79265368b79f253c094bebb2b9499f7d23",
+      "bytes": 15981,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/upgrade/livox_lidar_upgrader.h": {
+      "sha256": "836f1f9c1632edffa5f5a980ef6c5e5b855b6069f16f180a58ba181e72edb21f",
+      "bytes": 3443,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/upgrade_manager.cpp": {
+      "sha256": "848719bb42fc04f4f214b282a478fd97f3858749c5924cb9dc3a863826d02b86",
+      "bytes": 2833,
+      "mode": "644"
+    },
+    "third_party/livox_sdk2_system_spdlog/sdk_core/upgrade_manager.h": {
+      "sha256": "1128979b3e6ea4005504a53c198f1d5f238eef500295890e76a41fcb767033fc",
+      "bytes": 2486,
+      "mode": "644"
+    },
+    "导航膨胀与碰撞体积调整_20261104.md": {
+      "sha256": "292739b48df9c9c30b7a7a81ec82531c836dd817c60059c76bd3f89d38ea3dc7",
+      "bytes": 4774,
+      "mode": "644"
+    },
+    "导航避障优化实施说明_20261104.md": {
+      "sha256": "8edc4dda1b87f06b20583a33689bba25bfad6a8b0f1d9564cd61cf93f76f168e",
+      "bytes": 15122,
+      "mode": "644"
+    },
+    "机器狗复杂场景导航避障流畅性与稳定性优化方案.md": {
+      "sha256": "52ee089f26b7b2aa7c95a133f9f08aa8def5c9ebc0fcc24c880e404975c56e94",
+      "bytes": 24872,
+      "mode": "644"
+    }
+  }
+}

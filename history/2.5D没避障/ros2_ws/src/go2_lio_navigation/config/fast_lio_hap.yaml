@@ -1,0 +1,125 @@
+/**:
+  ros__parameters:
+    feature_extract_enable: false
+    # The previous 1-in-5 filter plus 0.40 m voxels left only about 437 points
+    # in the measured indoor bootstrap map and lost scan matching after motion.
+    # Keep enough geometry for stable plane constraints while staying well
+    # below the raw HAP point count.
+    point_filter_num: 2
+    max_iteration: 3
+    # 15 cm keeps substantially more wall/edge constraints during turns than
+    # the previous 20 cm grid, while point_filter_num=2 still bounds CPU use.
+    filter_size_surf: 0.15
+    filter_size_map: 0.15
+    # Keep half the local-map cube comfortably larger than
+    # MOV_THRESHOLD(1.5) * det_range, otherwise a stationary robot can make
+    # the cube oscillate and repeatedly delete its own map.
+    cube_side_length: 300.0
+    runtime_pos_log_enable: false
+    map_file_path: "/tmp/go2_fast_lio_map.pcd"
+
+    common:
+      lid_topic: "/livox/lidar"
+      imu_topic: "/livox/imu"
+      # HAP LiDAR and its internal IMU share the device clock. Do not enable
+      # FAST-LIO's coarse software synchronization unless a bag proves that
+      # the two streams have different clock epochs.
+      time_sync_en: false
+      time_offset_lidar_to_imu: 0.0
+      # Keep sensor callbacks independent from the mapping callback. The IMU
+      # depth covers more than ten seconds at the observed 150 Hz input rate.
+      imu_queue_depth: 2000
+      lidar_queue_depth: 5
+      executor_threads: 3
+
+    preprocess:
+      # Use the driver's PointCloud2 path to avoid the known CustomMsg backlog.
+      # The dedicated HAP parser still consumes timestamp/tag/line, so motion
+      # undistortion keeps per-point timing.
+      lidar_type: 5
+      scan_line: 6
+      blind: 0.25
+      timestamp_unit: 3
+      scan_rate: 15
+
+    mapping:
+      # Values are conservative startup defaults. Replace them with Allan
+      # variance results from this exact HAP before high-speed operation.
+      # The powered Go2 injects visible actuator vibration into HAP's internal
+      # IMU. Slightly larger process noise prevents that vibration from
+      # overpowering scan-to-map constraints during repeated in-place turns.
+      acc_cov: 0.20
+      gyr_cov: 0.20
+      b_acc_cov: 0.0001
+      b_gyr_cov: 0.0001
+      fov_degree: 125.0
+      det_range: 60.0
+      # Identity is only a startup assumption. Replace it with the calibrated
+      # LiDAR-to-IMU transform before high-speed operation.
+      extrinsic_est_en: false
+      # The robot must remain stationary during this initialization window.
+      imu_init_duration: 8.0
+      # HAP uses a non-repetitive scan pattern. Build the initial ikd-tree from
+      # multiple stationary scans instead of an underconstrained single scan.
+      initial_map_duration: 5.0
+      initial_map_min_voxels: 650
+      initial_map_max_duration: 12.0
+      # Discard the SDK's startup backlog before estimating gravity/bias.
+      # Once tracking, a time discontinuity requires restart rather than
+      # integrating across missing IMU samples and extending a false map.
+      input_max_age: 0.30
+      input_max_imu_gap: 0.05
+      input_max_scan_duration: 0.15
+      input_warmup_duration: 1.0
+      # A handful of plane matches must not validate an otherwise inertial
+      # prediction. Reject weak updates before map insertion/publication.
+      quality_min_matches: 50
+      quality_min_match_ratio: 0.05
+      quality_max_residual: 0.15
+      # Fail closed before an estimator blow-up can publish kilometre-scale
+      # odometry or contaminate the online map. Restart is required after trip.
+      # Navigation commands are limited to 0.40 m/s and 0.8 rad/s. HAP/Go2
+      # gait vibration produced a verified one-frame 2.037 rad/s estimate
+      # while position and linear velocity remained healthy, so retain a
+      # larger angular margin while keeping the translational trip strict.
+      safety_max_state_speed: 1.50
+      safety_max_pose_speed: 1.80
+      safety_max_angular_speed: 3.00
+      safety_max_position_radius: 30.0
+      safety_max_absolute_z: 0.60
+      safety_max_undistorted_range: 120.0
+      safety_max_invalid_point_fraction: 0.05
+      # HAP can occasionally deliver one truncated packet. Drop it without
+      # contaminating the map; only repeated corrupt packets stop the stack.
+      safety_corrupt_cloud_confirmation_samples: 3
+      extrinsic_T: [0.0, 0.0, 0.0]
+      extrinsic_R: [1.0, 0.0, 0.0,
+                    0.0, 1.0, 0.0,
+                    0.0, 0.0, 1.0]
+
+    publish:
+      path_en: false
+      effect_map_en: false
+      map_en: false
+      scan_publish_en: true
+      dense_publish_en: false
+      scan_bodyframe_pub_en: true
+      # Keep the obstacle cloud small and regular. The previous implementation
+      # ignored dense_publish_en for this topic and serialized the complete
+      # prefiltered HAP frame, causing multi-second /scan stalls under Nav2.
+      # 5 cm keeps narrow chair/table legs in the obstacle scan while still
+      # reducing the raw HAP frame by roughly an order of magnitude.
+      body_voxel_size: 0.05
+      # This topic serves Scan Context and the local obstacle pipeline. Keep a
+      # useful 20 m descriptor radius while bounding PCL's voxel index and
+      # avoiding serialization of distant returns that Nav2 never consumes.
+      body_max_range: 20.0
+      # A separate bridge applies the sensor-to-base transform and owns the
+      # only odom_lio -> base_link edge in the TF tree.
+      tf_en: false
+      world_frame: "odom_lio"
+      body_frame: "livox_frame"
+
+    pcd_save:
+      pcd_save_en: false
+      interval: -1

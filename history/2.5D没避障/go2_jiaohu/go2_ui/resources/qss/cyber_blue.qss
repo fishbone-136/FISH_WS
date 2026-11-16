@@ -1,0 +1,282 @@
+/* =========================================
+   FISHBONE — 深空霓虹主题
+   机器狗智能交互控制平台
+========================================= */
+
+/* =========================================
+   全局
+========================================= */
+
+QWidget
+{
+    background-color: #080C14;
+    color: #C8E8FF;
+    font-family: "Microsoft YaHei";
+    font-size: 14px;
+}
+
+
+/* =========================================
+   主窗口
+========================================= */
+
+QMainWindow
+{
+    background-color: #050912;
+}
+
+
+/* =========================================
+   面板
+========================================= */
+
+QFrame
+{
+    background-color: rgba(14, 22, 40, 200);
+    border: 1px solid #1A3454;
+    border-radius: 10px;
+}
+
+
+/* =========================================
+   NeonFrame
+========================================= */
+
+#NeonFrame
+{
+    background-color: rgba(14, 22, 40, 210);
+    border: 1px solid #1A3454;
+    border-radius: 0px;
+}
+
+
+/* =========================================
+   内容栈（去掉 QFrame 默认边框）
+========================================= */
+
+#ContentStack
+{
+    background: transparent;
+    border: none;
+}
+
+
+/* =========================================
+   顶部栏
+========================================= */
+
+#TopBar
+{
+    background: transparent;
+    border: none;
+}
+
+
+/* =========================================
+   标题（已弃用，保留兼容）
+========================================= */
+
+#TitleLabel
+{
+    color: #00F0FF;
+    font-size: 32px;
+    font-weight: bold;
+}
+
+
+/* =========================================
+   一级标题
+========================================= */
+
+#PanelTitle
+{
+    color: #00F0FF;
+    font-size: 18px;
+    font-weight: bold;
+}
+
+
+/* =========================================
+   按钮
+========================================= */
+
+QPushButton
+{
+    background-color: #0C1E3A;
+    border: 1px solid #1A5080;
+    border-radius: 6px;
+    padding: 8px;
+    min-height: 36px;
+    font-size: 14px;
+    font-weight: bold;
+    color: #A0D0F0;
+}
+
+QPushButton:hover
+{
+    background-color: #163358;
+    border: 1px solid #2898D0;
+    color: #C8F0FF;
+}
+
+QPushButton:pressed
+{
+    background-color: #081428;
+    border: 1px solid #0A5A80;
+}
+
+
+/* =========================================
+   输入框
+========================================= */
+
+QLineEdit,
+QTextEdit
+{
+    background-color: #0A1222;
+    border: 1px solid #1A3454;
+    border-radius: 6px;
+    padding: 5px;
+    color: #A8D8F8;
+    selection-background-color: #1A5080;
+}
+
+QLineEdit:focus,
+QTextEdit:focus
+{
+    border: 1px solid #1A5080;
+}
+
+
+/* =========================================
+   日志
+========================================= */
+
+QListWidget
+{
+    background-color: #0A1222;
+    border: 1px solid #1A3454;
+    border-radius: 8px;
+    color: #A8D8F8;
+}
+
+
+/* =========================================
+   状态卡
+========================================= */
+
+#StatusCard
+{
+    background-color: rgba(10, 20, 42, 220);
+    border: 1px solid #1A5080;
+    border-radius: 10px;
+}
+
+#StatusCard:hover
+{
+    border: 1px solid #00F0FF;
+}
+
+
+/* =========================================
+   底部导航
+========================================= */
+
+#BottomNav
+{
+    background-color: rgba(14, 22, 40, 240);
+    border: 1px solid #1A3454;
+    border-radius: 10px;
+}
+
+
+/* =========================================
+   滚动条
+========================================= */
+
+QScrollBar:vertical
+{
+    background: #080C14;
+    width: 6px;
+    border-radius: 3px;
+    margin: 0px;
+}
+
+QScrollBar::handle:vertical
+{
+    background: #1A3454;
+    border-radius: 3px;
+    min-height: 30px;
+}
+
+QScrollBar::handle:vertical:hover
+{
+    background: #285070;
+}
+
+QScrollBar::add-line:vertical,
+QScrollBar::sub-line:vertical
+{
+    height: 0px;
+}
+
+QScrollBar::add-page:vertical,
+QScrollBar::sub-page:vertical
+{
+    background: none;
+}
+
+
+/* =========================================
+   QScrollBar 水平
+========================================= */
+
+QScrollBar:horizontal
+{
+    background: #080C14;
+    height: 6px;
+    border-radius: 3px;
+}
+
+QScrollBar::handle:horizontal
+{
+    background: #1A3454;
+    border-radius: 3px;
+    min-width: 30px;
+}
+
+QScrollBar::handle:horizontal:hover
+{
+    background: #285070;
+}
+
+QScrollBar::add-line:horizontal,
+QScrollBar::sub-line:horizontal
+{
+    width: 0px;
+}
+
+
+/* =========================================
+   Label 默认
+========================================= */
+
+QLabel
+{
+    color: #C8E8FF;
+}
+
+
+/* =========================================
+   工具提示
+========================================= */
+
+QToolTip
+{
+    background-color: #0C1E3A;
+    color: #C8F0FF;
+    border: 1px solid #1A5080;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 12px;
+}

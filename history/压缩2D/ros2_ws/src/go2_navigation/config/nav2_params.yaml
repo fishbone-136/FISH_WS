@@ -1,0 +1,527 @@
+amcl:
+  ros__parameters:
+    use_sim_time: false
+    alpha1: 0.2
+    alpha2: 0.2
+    alpha3: 0.2
+    alpha4: 0.2
+    alpha5: 0.2
+    base_frame_id: base_link
+    beam_skip_distance: 0.5
+    beam_skip_error_threshold: 0.9
+    beam_skip_threshold: 0.3
+    do_beamskip: true
+    global_frame_id: map
+    lambda_short: 0.1
+    laser_likelihood_max_dist: 2.0
+    laser_max_range: 15.0
+    laser_min_range: 0.15
+    laser_model_type: likelihood_field_prob
+    max_beams: 120
+    max_particles: 2000
+    min_particles: 500
+    odom_frame_id: odom
+    pf_err: 0.04
+    pf_z: 0.99
+    recovery_alpha_fast: 0.0
+    recovery_alpha_slow: 0.0
+    resample_interval: 1
+    robot_model_type: nav2_amcl::DifferentialMotionModel
+    save_pose_rate: 0.5
+    sigma_hit: 0.2
+    tf_broadcast: true
+    transform_tolerance: 0.5
+    update_min_a: 0.08
+    update_min_d: 0.08
+    z_hit: 0.5
+    z_max: 0.05
+    z_rand: 0.5
+    z_short: 0.05
+    scan_topic: /scan
+
+bt_navigator:
+  ros__parameters:
+    use_sim_time: false
+    global_frame: map
+    robot_base_frame: base_link
+    odom_topic: /odom
+    # 10 Hz is enough for online replanning and avoids a 33 Hz stale-goal loop
+    # when localization disappears.
+    bt_loop_duration: 100
+    default_server_timeout: 20
+    wait_for_service_timeout: 1000
+    # 启动文件会将此占位值替换为包内行为树的绝对路径，避免写死用户目录。
+    default_nav_to_pose_bt_xml: ""
+    plugin_lib_names:
+      - go2_latest_goal_bt_node
+      - nav2_compute_path_to_pose_action_bt_node
+      - nav2_compute_path_through_poses_action_bt_node
+      - nav2_smooth_path_action_bt_node
+      - nav2_follow_path_action_bt_node
+      - nav2_spin_action_bt_node
+      - nav2_wait_action_bt_node
+      - nav2_assisted_teleop_action_bt_node
+      - nav2_back_up_action_bt_node
+      - nav2_drive_on_heading_bt_node
+      - nav2_clear_costmap_service_bt_node
+      - nav2_is_stuck_condition_bt_node
+      - nav2_goal_reached_condition_bt_node
+      - nav2_goal_updated_condition_bt_node
+      - nav2_globally_updated_goal_condition_bt_node
+      - nav2_is_path_valid_condition_bt_node
+      - nav2_initial_pose_received_condition_bt_node
+      - nav2_reinitialize_global_localization_service_bt_node
+      - nav2_rate_controller_bt_node
+      - nav2_distance_controller_bt_node
+      - nav2_speed_controller_bt_node
+      - nav2_truncate_path_action_bt_node
+      - nav2_truncate_path_local_action_bt_node
+      - nav2_goal_updater_node_bt_node
+      - nav2_recovery_node_bt_node
+      - nav2_pipeline_sequence_bt_node
+      - nav2_round_robin_node_bt_node
+      - nav2_transform_available_condition_bt_node
+      - nav2_time_expired_condition_bt_node
+      - nav2_path_expiring_timer_condition
+      - nav2_distance_traveled_condition_bt_node
+      - nav2_single_trigger_bt_node
+      - nav2_goal_updated_controller_bt_node
+      - nav2_is_battery_low_condition_bt_node
+      - nav2_navigate_through_poses_action_bt_node
+      - nav2_navigate_to_pose_action_bt_node
+      - nav2_remove_passed_goals_action_bt_node
+      - nav2_planner_selector_bt_node
+      - nav2_controller_selector_bt_node
+      - nav2_goal_checker_selector_bt_node
+      - nav2_controller_cancel_bt_node
+      - nav2_path_longer_on_approach_bt_node
+      - nav2_wait_cancel_bt_node
+      - nav2_spin_cancel_bt_node
+      - nav2_back_up_cancel_bt_node
+      - nav2_assisted_teleop_cancel_bt_node
+      - nav2_drive_on_heading_cancel_bt_node
+      - nav2_is_battery_charging_condition_bt_node
+
+controller_server:
+  ros__parameters:
+    use_sim_time: false
+    # Follow the 15 Hz HAP safety lane with a new checked arc each cycle.
+    controller_frequency: 15.0
+    min_x_velocity_threshold: 0.001
+    min_y_velocity_threshold: 0.001
+    min_theta_velocity_threshold: 0.001
+    failure_tolerance: 0.3
+    progress_checker_plugin: progress_checker
+    goal_checker_plugins: [goal_checker]
+    controller_plugins: [FollowPath, FollowPathMPPI]
+    progress_checker:
+      # 原地转向也属于有效进展，避免转向阶段被误判为“Failed to make progress”。
+      plugin: nav2_controller::PoseProgressChecker
+      required_movement_radius: 0.10
+      required_movement_angle: 0.15
+      # Fail a non-executed base command promptly; normal Go2 gait startup in
+      # testing is well below this interval.
+      movement_time_allowance: 6.0
+    goal_checker:
+      plugin: go2_navigation::StableGoalChecker
+      # Position within 10 cm succeeds at any final heading.
+      xy_goal_tolerance: 0.10
+      # Final heading is ignored; the local controller does not align it.
+      yaw_goal_tolerance: 3.141592653589793
+      check_yaw: false
+      stateful: true
+      position_hysteresis: 0.0
+      goal_identity_distance: 0.15
+    FollowPath:
+      # 四足机器人不适合边走边反复切换旋转方向。RotationShim 先沿
+      # 最短方向稳定对正路径，再交给低负载 DWB 连续跟踪。
+      plugin: go2_navigation::StableRotationShim
+      primary_controller: dwb_core::DWBLocalPlanner
+      trajectory_generator_name: go2_navigation::GaitTrajectoryGenerator
+      gait_min_translation: 0.22
+      # 大于约 57° 的方向误差先尝试对正；受阻时交给完整足迹检查的弧线。
+      # 这能避免机器狗以较大的斜角起步，看起来没有朝目标方向运动。
+      # 启动/退出滞回仍可避免 SLAM 小幅波动造成控制器反复切换。
+      angular_dist_threshold: 1.0
+      angular_disengage_threshold: 0.28
+      forward_sampling_distance: 0.65
+      # Far from alignment turn faster; slow down near handover. The shim
+      # collision-checks this profile before the downstream smoother sees it.
+      rotate_to_heading_angular_vel: 1.4
+      min_rotation_angular_vel: 0.55
+      final_rotation_angular_vel: 0.65
+      final_min_rotation_angular_vel: 0.50
+      goal_position_hysteresis: 0.0
+      goal_identity_distance: 0.15
+      goal_approach_distance: 0.45
+      goal_approach_speed: 0.26
+      rotation_gain: 2.2
+      max_transform_age: 0.5
+      max_angular_accel: 2.00
+      simulate_ahead_time: 1.80
+      # LiDAR 里程计的角速度在刚起步时仍接近零，闭环限速会每周期
+      # 都从零重新爬升，使后方目标长时间没有物理动作。开环按上一条
+      # 已发布指令连续爬升，与后级 velocity_smoother 的安全限速一致。
+      closed_loop: false
+      # 到达 10 cm 位置范围即成功，不对齐目标箭头朝向。
+      rotate_to_goal_heading: false
+      debug_trajectory_details: false
+      min_vel_x: 0.0
+      min_vel_y: 0.0
+      max_vel_x: 0.65
+      max_vel_y: 0.0
+      max_vel_theta: 1.4
+      # 非零候选必须跨过 Go2 能稳定形成步态的速度区间；零速仍由目标
+      # 检查器直接输出，避免 0.01 m/s 一类命令让关节反复试探起步。
+      min_speed_xy: 0.22
+      max_speed_xy: 0.65
+      # Keep pure-turn samples in the usable gait range upstream, where the
+      # trajectory collision checker can account for the actual command.
+      min_speed_theta: 0.55
+      acc_lim_x: 0.85
+      acc_lim_y: 0.0
+      acc_lim_theta: 2.00
+      decel_lim_x: -1.10
+      decel_lim_y: 0.0
+      decel_lim_theta: -2.20
+      # 11 x 1 x 25 = 275 candidates (-27%); preserve fine yaw spacing and
+      # the full collision horizon at the sensor-matched 15 Hz control rate.
+      vx_samples: 11
+      vy_samples: 1
+      vtheta_samples: 25
+      sim_time: 1.7
+      linear_granularity: 0.05
+      angular_granularity: 0.04
+      transform_tolerance: 0.35
+      xy_goal_tolerance: 0.10
+      trans_stopped_velocity: 0.08
+      short_circuit_trajectory_evaluation: true
+      stateful: false
+      # 最终朝向由外层 RotationShim 处理，DWB 本身无需重复加载
+      # RotateToGoal critic。
+      critics: [Oscillation, ObstacleFootprint, BaseObstacle, PathAlign, PathDist, GoalDist, Twirling]
+      # Prefer clearance around the full gait envelope, including corners.
+      # Path following must not outweigh the cost of skimming a wall.
+      ObstacleFootprint.scale: 2.0
+      BaseObstacle.scale: 0.60
+      # 靠近终点时优先缩短位置距离，而不是为贴合路径切线原地对齐。
+      PathAlign.scale: 4.0
+      PathAlign.forward_point_distance: 0.25
+      PathDist.scale: 8.0
+      GoalDist.scale: 24.0
+      Twirling.scale: 3.0
+    FollowPathMPPI:
+      # The launch constructs only the selected controller and its behavior tree.
+      plugin: go2_navigation::StableRotationShim
+      primary_controller: nav2_mppi_controller::MPPIController
+      angular_dist_threshold: 1.0
+      angular_disengage_threshold: 0.28
+      forward_sampling_distance: 0.65
+      rotate_to_heading_angular_vel: 1.4
+      min_rotation_angular_vel: 0.55
+      final_rotation_angular_vel: 0.65
+      final_min_rotation_angular_vel: 0.50
+      goal_position_hysteresis: 0.0
+      goal_identity_distance: 0.15
+      goal_approach_distance: 0.45
+      goal_approach_speed: 0.26
+      rotation_gain: 2.2
+      max_transform_age: 0.5
+      max_angular_accel: 2.00
+      simulate_ahead_time: 1.80
+      closed_loop: false
+      rotate_to_goal_heading: false
+      # Match the 15 Hz controller, retaining approximately 2.5 s lookahead.
+      time_steps: 38
+      model_dt: 0.0666666667
+      batch_size: 600
+      vx_std: 0.20
+      vy_std: 0.0
+      wz_std: 0.35
+      vx_max: 0.65
+      vx_min: 0.0
+      vy_max: 0.0
+      wz_max: 1.4
+      iteration_count: 1
+      prune_distance: 1.5
+      temperature: 0.30
+      gamma: 0.015
+      motion_model: DiffDrive
+      visualize: false
+      critics: [ConstraintCritic, CostCritic, GoalCritic, GoalAngleCritic,
+        PathAlignCritic, PathFollowCritic, PathAngleCritic, PreferForwardCritic]
+      ConstraintCritic.enabled: true
+      CostCritic.enabled: true
+      CostCritic.consider_footprint: true
+      CostCritic.cost_weight: 5.0
+      CostCritic.critical_cost: 300.0
+      GoalCritic.enabled: true
+      GoalCritic.cost_weight: 5.0
+      GoalCritic.threshold_to_consider: 1.4
+      GoalAngleCritic.enabled: false
+      PathAlignCritic.enabled: true
+      PathAlignCritic.cost_weight: 10.0
+      PathAlignCritic.max_path_occupancy_ratio: 0.07
+      PathAlignCritic.trajectory_point_step: 4
+      PathAlignCritic.threshold_to_consider: 0.5
+      PathFollowCritic.enabled: true
+      PathFollowCritic.cost_weight: 5.0
+      PathFollowCritic.offset_from_furthest: 5
+      PathFollowCritic.threshold_to_consider: 1.4
+      PathAngleCritic.enabled: true
+      PathAngleCritic.cost_weight: 2.0
+      PathAngleCritic.offset_from_furthest: 4
+      PathAngleCritic.threshold_to_consider: 0.5
+      PreferForwardCritic.enabled: true
+      PreferForwardCritic.cost_weight: 5.0
+      PreferForwardCritic.threshold_to_consider: 0.5
+
+local_costmap:
+  local_costmap:
+    ros__parameters:
+      update_frequency: 15.0
+      # A 10 Hz ceiling publishes about every second 15 Hz safety tick.
+      publish_frequency: 10.0
+      global_frame: odom
+      robot_base_frame: base_link
+      use_sim_time: false
+      rolling_window: true
+      # User-selected 4 m rolling window: 2 m from the robot centre on each
+      # side. Raw-scan safety checks retain their independent sensor range.
+      width: 4
+      height: 4
+      resolution: 0.04
+      # Keep the nominal body/stance envelope; user-selected 7 cm outer margin.
+      # Effective planning and stop rectangle: +/-0.45 x +/-0.27 m.
+      footprint: "[[0.38, 0.20], [0.38, -0.20], [-0.38, -0.20], [-0.38, 0.20]]"
+      footprint_padding: 0.07
+      transform_tolerance: 0.35
+      plugins: [traversability_layer, obstacle_layer, denoise_layer, inflation_layer]
+      # Enabled only by go2_lio_navigation. It carries slope/step/roughness
+      # costs from the rolling 2.5-D grid into the local controller.
+      traversability_layer:
+        plugin: nav2_costmap_2d::StaticLayer
+        enabled: false
+        map_topic: /traversability/local
+        map_subscribe_transient_local: true
+        subscribe_to_updates: false
+        track_unknown_space: false
+        use_maximum: true
+        trinary_costmap: false
+      obstacle_layer:
+        plugin: nav2_costmap_2d::ObstacleLayer
+        enabled: true
+        footprint_clearing_enabled: true
+        observation_sources: scan
+        scan:
+          topic: /scan
+          max_obstacle_height: 1.0
+          clearing: true
+          marking: true
+          data_type: LaserScan
+          # inf 射线参与清障，移动目标离开后不会长时间残留“鬼影”。
+          inf_is_valid: true
+          # 保持约 1-2 个扫描周期，避免细杆/桌脚因一帧反射缺失而闪烁；
+          # 清障射线仍会及时移除已经离开的动态目标。
+          # Keep the latest scan even when TF/filter latency exceeds 100 ms.
+          # Expiring a tiny history by sensor time can discard every return.
+          # Independent scan freshness gating still stops stale observations.
+          observation_persistence: 0.0
+          # HAP 当前平均约 8.5 Hz，但板端调度尖峰实测可到 1.25 s，
+          # 偶发还会略超 2 s。该值只用于掉线监测，不降低逐帧处理速度；
+          # 留出 3 s 可避免短调度尖峰把 costmap 误判为 not current。
+          expected_update_rate: 3.0
+          raytrace_max_range: 5.50
+          raytrace_min_range: 0.10
+          obstacle_max_range: 5.00
+          obstacle_min_range: 0.10
+      denoise_layer:
+        plugin: nav2_costmap_2d::DenoiseLayer
+        enabled: true
+        # A real chair leg may occupy just one cell, especially in the 8 cm
+        # global map. Do not delete it as noise after ground/self filtering.
+        minimal_group_size: 1
+        group_connectivity_type: 8
+      inflation_layer:
+        plugin: nav2_costmap_2d::InflationLayer
+        # 0.27 m protected half-width plus a 0.04 m gradual preference band.
+        # Nav2 measures this radius from obstacle cells to the robot centre.
+        cost_scaling_factor: 8.0
+        inflation_radius: 0.30
+      always_send_full_costmap: false
+
+global_costmap:
+  global_costmap:
+    ros__parameters:
+      # 125 ms global terrain/costmap updates match the structural terrain.
+      # The local collision layer and controller run at 15 Hz.
+      update_frequency: 8.0
+      # Slightly above the update rate so every update can publish, avoiding
+      # half-rate output when two equal-period clocks fall on opposite sides.
+      publish_frequency: 10.0
+      global_frame: map
+      robot_base_frame: base_link
+      use_sim_time: false
+      # Static-map localization keeps this false and automatically sizes to the
+      # saved map. go2_mapping.launch.py rewrites it to a 20 m rolling window so
+      # early online-map goals cannot fall a few cells beyond the growing map.
+      rolling_window: false
+      width: 20
+      height: 20
+      footprint: "[[0.38, 0.20], [0.38, -0.20], [-0.38, -0.20], [-0.38, 0.20]]"
+      footprint_padding: 0.07
+      # Eight-centimetre global cells are sufficient for this footprint and
+      # reduce the 20 m rolling grid from 250k to 62.5k cells.
+      resolution: 0.08
+      transform_tolerance: 0.35
+      track_unknown_space: true
+      plugins: [static_layer, obstacle_layer, denoise_layer, inflation_layer]
+      static_layer:
+        plugin: nav2_costmap_2d::StaticLayer
+        enabled: true
+        map_topic: /map
+        map_subscribe_transient_local: true
+        subscribe_to_updates: true
+        use_maximum: true
+        trinary_costmap: false
+      obstacle_layer:
+        plugin: nav2_costmap_2d::ObstacleLayer
+        enabled: true
+        footprint_clearing_enabled: true
+        observation_sources: scan
+        scan:
+          topic: /scan
+          max_obstacle_height: 1.0
+          clearing: true
+          marking: true
+          data_type: LaserScan
+          inf_is_valid: true
+          observation_persistence: 0.0
+          # 与局部层一致，仅作为传感器掉线阈值；收到的扫描仍逐帧处理。
+          expected_update_rate: 3.0
+          raytrace_max_range: 5.5
+          raytrace_min_range: 0.10
+          obstacle_max_range: 5.0
+          obstacle_min_range: 0.10
+      denoise_layer:
+        plugin: nav2_costmap_2d::DenoiseLayer
+        enabled: true
+        minimal_group_size: 1
+        group_connectivity_type: 8
+      inflation_layer:
+        plugin: nav2_costmap_2d::InflationLayer
+        cost_scaling_factor: 8.0
+        # Keep the full 0.27 m protected inscribed radius. The small numerical
+        # allowance avoids float rounding putting the radius below the body.
+        inflation_radius: 0.30
+      always_send_full_costmap: false
+
+map_server:
+  ros__parameters:
+    use_sim_time: false
+    yaml_filename: ""
+
+map_saver:
+  ros__parameters:
+    use_sim_time: false
+    save_map_timeout: 10.0
+    free_thresh_default: 0.25
+    occupied_thresh_default: 0.65
+    map_subscribe_transient_local: true
+
+planner_server:
+  ros__parameters:
+    expected_planner_frequency: 2.0
+    use_sim_time: false
+    planner_plugins: [GridBased]
+    GridBased:
+      # LIO selects ExactGoalSmac2D: keep the original clicked endpoint.
+      plugin: nav2_navfn_planner/NavfnPlanner
+      # A blocked target must fail rather than succeed at a substituted point.
+      tolerance: 0.0
+      use_astar: true
+      allow_unknown: true
+      # LIO selects ExactGoalSmac2D; legacy non-LIO launches keep NavFn.
+      downsample_costmap: false
+      downsampling_factor: 1
+      max_iterations: 1000000
+      max_on_approach_iterations: 1000
+      max_planning_time: 0.5
+      cost_travel_multiplier: 3.0
+      use_final_approach_orientation: false
+
+smoother_server:
+  ros__parameters:
+    use_sim_time: false
+    smoother_plugins: [simple_smoother]
+    simple_smoother:
+      plugin: nav2_smoother::SimpleSmoother
+      # 保留规划器给出的安全走廊，同时消除 4 cm 栅格路径的锯齿拐点。
+      tolerance: 1.0e-6
+      max_its: 400
+      w_data: 0.25
+      w_smooth: 0.35
+      do_refinement: true
+
+behavior_server:
+  ros__parameters:
+    use_sim_time: false
+    costmap_topic: local_costmap/costmap_raw
+    footprint_topic: local_costmap/published_footprint
+    cycle_frequency: 10.0
+    behavior_plugins: [spin, backup, drive_on_heading, assisted_teleop, wait]
+    spin:
+      plugin: nav2_behaviors/Spin
+    backup:
+      plugin: nav2_behaviors/BackUp
+    drive_on_heading:
+      plugin: nav2_behaviors/DriveOnHeading
+    assisted_teleop:
+      plugin: nav2_behaviors/AssistedTeleop
+    wait:
+      plugin: nav2_behaviors/Wait
+    global_frame: odom
+    robot_base_frame: base_link
+    transform_tolerance: 0.2
+    simulate_ahead_time: 2.0
+    max_rotational_vel: 0.65
+    min_rotational_vel: 0.4
+    rotational_acc_lim: 0.9
+
+waypoint_follower:
+  ros__parameters:
+    use_sim_time: false
+    loop_rate: 20
+    stop_on_failure: false
+    waypoint_task_executor_plugin: wait_at_waypoint
+    wait_at_waypoint:
+      plugin: nav2_waypoint_follower::WaitAtWaypoint
+      enabled: true
+      waypoint_pause_duration: 200
+
+velocity_smoother:
+  ros__parameters:
+    use_sim_time: false
+    # 20 ms command ramps reduce the step size between gait updates.
+    smoothing_frequency: 50.0
+    # 某一轴触发加速度限制时按比例缩放其它轴，保持控制器要求的曲率，
+    # 避免线速度和角速度分别截断造成转弯轨迹顿挫或左右摆动。
+    scale_velocities: true
+    # Go2 measured odometry remains at zero until the first command exceeds the
+    # physical gait deadband. CLOSED_LOOP therefore restarted acceleration from
+    # zero every cycle and held yaw around 0.08-0.10 rad/s forever. OPEN_LOOP
+    # ramps from the previously emitted command and breaks that start-up lock.
+    feedback: OPEN_LOOP
+    max_velocity: [0.65, 0.0, 1.4]
+    min_velocity: [0.0, 0.0, -1.4]
+    # 四足步态需要比轮式底盘更柔和的速度斜坡；角向仍保持对称，避免
+    # 原地旋转、反向修正以及到点收速时出现明显一顿。
+    max_accel: [0.85, 0.0, 2.00]
+    max_decel: [-1.10, 0.0, -2.20]
+    odom_topic: /odom
+    odom_duration: 0.1
+    # The controller already excludes unusable steady-state pure turns.
+    # A smaller output deadband preserves the yaw ramp and gentle arc turns
+    # instead of repeatedly converting them to StopMove or straight walking.
+    deadband_velocity: [0.04, 0.0, 0.05]
+    velocity_timeout: 0.5

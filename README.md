@@ -3,6 +3,8 @@
 本仓库保存当前工程的源码、配置模板、测试和构建脚本。模型权重、虚拟环境、CUDA/PyTorch 运行库、编译产物、实机地图和历史测试数据不上传。
 重新部署前请先阅读 [模型与本地环境说明](docs/LOCAL_RESOURCES.md)；已保留的第三方源码及其版本见 [第三方源码来源](docs/THIRD_PARTY.md)。
 
+上一级“历史版本”中的源码副本已单独收录，见 [历史版本索引](history/README.md)。
+
 本目录把原 `go2_jiaohu` 交互界面与 `yasuo` 导航工作空间迁移到：
 
 - Ubuntu 22.04（Jammy，amd64 / arm64）

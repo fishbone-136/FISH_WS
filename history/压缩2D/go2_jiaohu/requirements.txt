@@ -1,0 +1,7 @@
+# 通用 Python 依赖。Ubuntu 22.04 / ROS 2 Humble 上请优先运行项目根目录的
+# scripts/install_dependencies.sh；PyQt5、OpenCV、NumPy、PyAudio 从 apt 安装，
+# 可避免覆盖 rclpy/cv_bridge 依赖的系统 Python ABI。
+SpeechRecognition>=3.10,<4
+pyttsx3>=2.90,<3
+# faster-whisper 由 install_interaction_dependencies.sh 隔离安装；直接写在这里会让
+# pip 用 NumPy 2 覆盖 ROS 2 Humble 的系统 NumPy，破坏 cv_bridge/MediaPipe ABI。

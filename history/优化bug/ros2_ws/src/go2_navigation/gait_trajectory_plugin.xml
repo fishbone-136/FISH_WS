@@ -1,0 +1,7 @@
+<library path="go2_gait_trajectory_generator">
+  <class name="go2_navigation::GaitTrajectoryGenerator"
+         type="go2_navigation::GaitTrajectoryGenerator"
+         base_class_type="dwb_core::TrajectoryGenerator">
+    <description>DWB trajectories with usable walking speeds and genuine in-place turns.</description>
+  </class>
+</library>

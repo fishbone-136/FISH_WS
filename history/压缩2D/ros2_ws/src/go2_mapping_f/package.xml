@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.ros.org/schema/package_format3.xsd"?>
+<package format="3">
+  <name>go2_mapping_f</name>
+  <version>0.1.0</version>
+  <description>Experimental low-smear online mapping pipeline for the Go2.</description>
+  <maintainer email="fishbone@example.com">fishbone</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <exec_depend>ament_index_python</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>go2_core</exec_depend>
+  <exec_depend>go2_navigation</exec_depend>
+  <exec_depend>go2_perception</exec_depend>
+  <exec_depend>go2_slam</exec_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>nav2_common</exec_depend>
+  <exec_depend>nav2_lifecycle_manager</exec_depend>
+  <exec_depend>nav2_map_server</exec_depend>
+  <exec_depend>nav_msgs</exec_depend>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>rviz2</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>slam_toolbox</exec_depend>
+
+  <test_depend>ament_flake8</test_depend>
+  <test_depend>ament_pep257</test_depend>
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

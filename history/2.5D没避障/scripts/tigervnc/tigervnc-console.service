@@ -1,0 +1,19 @@
+[Unit]
+Description=TigerVNC local login screen and desktop over Wi-Fi
+Wants=display-manager.service avahi-daemon.service
+After=display-manager.service avahi-daemon.service systemd-logind.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 -u /usr/local/libexec/tigervnc-console.py --server /usr/bin/X0tigervnc --password /etc/tigervnc/console.passwd --runtime /run/tigervnc-console
+Restart=always
+RestartSec=3
+RuntimeDirectory=tigervnc-console
+RuntimeDirectoryMode=0755
+UMask=0077
+NoNewPrivileges=yes
+ProtectSystem=full
+ProtectHome=read-only
+
+[Install]
+WantedBy=graphical.target

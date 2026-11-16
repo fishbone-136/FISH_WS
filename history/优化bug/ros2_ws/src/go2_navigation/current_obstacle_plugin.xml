@@ -1,0 +1,5 @@
+<library path="go2_current_obstacle_layer">
+  <class type="go2_navigation::CurrentObstacleLayer" base_class_type="nav2_costmap_2d::Layer">
+    <description>Current scan contribution; persistent obstacles belong to the independent memory layer.</description>
+  </class>
+</library>

@@ -1,0 +1,54 @@
+traversability_mapper:
+  ros__parameters:
+    local_cloud_topic: /cloud_registered
+    global_cloud_topic: /loop_closure/global_map
+    local_map_topic: /traversability/local
+    global_map_topic: /traversability/global
+    elevation_topic: /elevation/local
+    odom_frame: odom_lio
+    map_frame: map
+    base_frame: base_link
+    localization_valid_topic: /lio/localization_valid
+    # Historical pose-graph points are unsuitable for the live costmap until
+    # the LIO front end and loop calibration have completed a repeatable route.
+    # A rolling grid built from recent observations clears naturally and cannot
+    # retain drift ghosts. The pose graph still runs and publishes separately.
+    use_pose_graph_cloud: false
+    # Match the global navigation field at 125 ms. The
+    # 15 Hz local scan layer continues handling immediate collision safety.
+    update_rate: 8.0
+    # A short rolling window limits gait/LIO smear. Up to three recent frames
+    # are sufficient because /scan independently handles immediate obstacles.
+    history_seconds: 0.35
+    max_history_clouds: 3
+    # Exact alignment with 4 cm local / 8 cm global safety overlays avoids
+    # extra edge expansion from overlapping, non-integral source cells.
+    resolution: 0.08
+    local_length_x: 10.0
+    local_length_y: 10.0
+    global_length_x: 20.0
+    global_length_y: 20.0
+    min_points_per_cell: 2
+    # The loop-closure cloud is already voxel-filtered at keyframes. Requiring
+    # three points in every 10 cm cell makes the global grid effectively empty.
+    # Require repeat evidence before a terrain endpoint can become occupied;
+    # ray-traced visible space is still marked free on every frame.
+    global_min_points_per_cell: 2
+    max_slope_deg: 30.0
+    # Fit a neighbourhood surface; keep the independent 15 cm step and
+    # 22 cm vertical-extent checks for actual discontinuities and walls.
+    slope_baseline: 0.24
+    max_step_height: 0.15
+    # Powered-leg vibration and centimetre-scale LIO height noise previously
+    # made broad patches of a flat indoor floor lethal at 7 cm roughness.
+    max_roughness: 0.10
+    obstacle_height: 0.22
+    # Live HAP data puts the floor about 0.78 m below base_link. The previous
+    # -0.65 m cutoff removed the floor and left only obstacle cells.
+    min_relative_height: -1.05
+    max_relative_height: 1.20
+    lethal_cost: 90
+    unknown_value: -1
+    # Mark the visible line of sight before each recent point return as free.
+    # Without this, an endpoint-only grid contains mostly walls and unknowns.
+    raytrace_free_space: true

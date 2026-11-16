@@ -1,0 +1,295 @@
+# Environment + measured 2.5D terrain + current navigation clearance.
+Panels:
+- Class: rviz_common/Displays
+  Name: Displays
+  Help Height: 0
+  Property Tree Widget:
+    Expanded:
+    - /Status1
+    Splitter Ratio: 0.62
+  Tree Height: 450
+- Class: nav2_rviz_plugins/Navigation 2
+  Name: Navigation 2
+- Class: rviz_common/Views
+  Name: Views
+Visualization Manager:
+  Class: ''
+  Enabled: true
+  Name: root
+  Global Options:
+    Background Color: 19; 25; 34
+    Fixed Frame: map
+    Frame Rate: 15
+  Displays:
+  - Class: rviz_default_plugins/Marker
+    Name: Navigation Fault - Stop and Check Connection
+    Enabled: true
+    Value: true
+    Topic:
+      Value: /safety/navigation_fault_marker
+      Depth: 1
+      Reliability Policy: Reliable
+      Durability Policy: Transient Local
+      History Policy: Keep Last
+  - Class: rviz_default_plugins/Grid
+    Name: Optional - 1 m Reference Grid
+    Enabled: false
+    Value: false
+    Alpha: 0.12
+    Cell Size: 1
+    Plane Cell Count: 20
+    Color: 115; 135; 155
+    Reference Frame: map
+  - Class: rviz_default_plugins/Map
+    Name: Environment Map - Reference / Grey Unknown
+    Enabled: true
+    Value: true
+    Alpha: 0.25
+    Color Scheme: map
+    Draw Behind: true
+    Topic:
+      Value: /mapping/environment_map
+      Depth: 1
+      Reliability Policy: Reliable
+      Durability Policy: Transient Local
+      History Policy: Keep Last
+    Use Timestamp: false
+  - Class: rviz_default_plugins/PointCloud2
+    Name: Environment Terrain - Measured Height / Cost
+    Enabled: true
+    Value: true
+    Alpha: 0.92
+    Position Transformer: XYZ
+    Color Transformer: Intensity
+    Channel Name: intensity
+    Autocompute Intensity Bounds: false
+    Min Intensity: 0
+    Max Intensity: 100
+    Min Color: 90; 190; 145
+    Max Color: 235; 100; 85
+    Use rainbow: false
+    Style: Flat Squares
+    Size (m): 0.14
+    Size (Pixels): 3
+    Decay Time: 0
+    Topic:
+      Value: /mapping/terrain_surface
+      Depth: 1
+      Reliability Policy: Reliable
+      Durability Policy: Transient Local
+      History Policy: Keep Last
+  - Class: rviz_default_plugins/PointCloud2
+    Name: Live 2.5D Terrain - Green Safe / Red Blocked
+    Enabled: true
+    Value: true
+    Alpha: 0.95
+    Position Transformer: XYZ
+    Color Transformer: Intensity
+    Channel Name: intensity
+    Autocompute Intensity Bounds: false
+    Min Intensity: 0
+    Max Intensity: 100
+    Min Color: 90; 190; 145
+    Max Color: 235; 100; 85
+    Use rainbow: false
+    Style: Flat Squares
+    Size (m): 0.075
+    Size (Pixels): 3
+    Decay Time: 0
+    Topic:
+      Value: /traversability/terrain_surface
+      Depth: 1
+      Reliability Policy: Reliable
+      Durability Policy: Transient Local
+      History Policy: Keep Last
+  - Class: rviz_default_plugins/PointCloud2
+    Name: Environment Structure - Walls and Furniture
+    Enabled: true
+    Value: true
+    Alpha: 0.6
+    Position Transformer: XYZ
+    Color Transformer: FlatColor
+    Color: 185; 205; 225
+    Style: Points
+    Size (m): 0.025
+    Size (Pixels): 2
+    Decay Time: 0
+    Topic:
+      Value: /mapping/environment_cloud
+      Depth: 1
+      Reliability Policy: Reliable
+      Durability Policy: Transient Local
+      History Policy: Keep Last
+  - Class: rviz_default_plugins/PointCloud2
+    Name: Optional - Height Colours
+    Enabled: false
+    Value: false
+    Alpha: 1
+    Position Transformer: XYZ
+    Color Transformer: AxisColor
+    Axis: Z
+    Autocompute Value Bounds:
+      Value: true
+    Style: Flat Squares
+    Size (m): 0.14
+    Decay Time: 0
+    Topic:
+      Value: /mapping/terrain_surface
+      Depth: 1
+      Reliability Policy: Reliable
+      Durability Policy: Transient Local
+      History Policy: Keep Last
+  - Class: rviz_default_plugins/Map
+    Name: Optional - Global Navigation Costs
+    Enabled: false
+    Value: false
+    Alpha: 0.35
+    Color Scheme: costmap
+    Draw Behind: false
+    Topic:
+      Value: /global_costmap/costmap
+      Depth: 1
+      Reliability Policy: Reliable
+      Durability Policy: Transient Local
+      History Policy: Keep Last
+    Update Topic:
+      Value: /global_costmap/costmap_updates
+      Depth: 5
+      Reliability Policy: Reliable
+      Durability Policy: Volatile
+      History Policy: Keep Last
+    Use Timestamp: false
+  - Class: rviz_default_plugins/LaserScan
+    Name: Optional - Raw Obstacle Points
+    Enabled: false
+    Value: false
+    Alpha: 1
+    Position Transformer: XYZ
+    Color Transformer: FlatColor
+    Color: 255; 145; 20
+    Style: Points
+    Size (Pixels): 3
+    Decay Time: 0
+    Topic:
+      Value: /scan
+      Depth: 1
+      Reliability Policy: Best Effort
+      Durability Policy: Volatile
+      History Policy: Keep Last
+  - Class: rviz_default_plugins/Odometry
+    Name: Robot - Blue Heading Arrow
+    Enabled: true
+    Value: true
+    Keep: 1
+    Covariance:
+      Value: false
+    Shape:
+      Value: Arrow
+      Color: 65; 170; 255
+      Alpha: 1
+      Shaft Length: 0.45
+      Shaft Radius: 0.055
+      Head Length: 0.25
+      Head Radius: 0.12
+    Topic:
+      Value: /odom
+      Depth: 1
+      Reliability Policy: Reliable
+      Durability Policy: Volatile
+      History Policy: Keep Last
+  - Class: rviz_default_plugins/Path
+    Name: Plan - Gold
+    Enabled: true
+    Value: true
+    Color: 255; 205; 90
+    Alpha: 1
+    Line Style: Billboards
+    Line Width: 0.055
+    Pose Style: None
+    Buffer Length: 1
+    Topic:
+      Value: /plan
+      Depth: 1
+      Reliability Policy: Reliable
+      Durability Policy: Volatile
+      History Policy: Keep Last
+  - Class: rviz_default_plugins/Path
+    Name: History - Cyan / Loop Corrected
+    Enabled: true
+    Value: true
+    Color: 75; 175; 225
+    Alpha: 0.7
+    Line Style: Billboards
+    Line Width: 0.025
+    Pose Style: None
+    Buffer Length: 1
+    Topic:
+      Value: /loop_closure/corrected_path
+      Depth: 1
+      Reliability Policy: Reliable
+      Durability Policy: Transient Local
+      History Policy: Keep Last
+  - Class: rviz_default_plugins/Polygon
+    Name: Safety Footprint
+    Enabled: true
+    Value: true
+    Alpha: 1.0
+    Color: 245; 170; 55
+    Topic:
+      Value: /local_costmap/published_footprint
+      Depth: 1
+      Reliability Policy: Best Effort
+      Durability Policy: Volatile
+      History Policy: Keep Last
+  - Class: rviz_default_plugins/Map
+    Name: Live Navigation Clearance - Coloured Areas Are Restricted
+    Enabled: true
+    Value: true
+    Alpha: 0.25
+    Color Scheme: costmap
+    Draw Behind: false
+    Topic:
+      Value: /local_costmap/costmap
+      Depth: 1
+      Reliability Policy: Reliable
+      Durability Policy: Transient Local
+      History Policy: Keep Last
+    Update Topic:
+      Value: /local_costmap/costmap_updates
+      Depth: 5
+      Reliability Policy: Reliable
+      Durability Policy: Volatile
+      History Policy: Keep Last
+    Use Timestamp: false
+  Tools:
+  - Class: rviz_default_plugins/Interact
+  - Class: rviz_default_plugins/MoveCamera
+  - Class: rviz_default_plugins/FocusCamera
+  - Class: rviz_default_plugins/Measure
+  - Class: nav2_rviz_plugins/GoalTool
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Name: Environment and 2.5D Navigation
+      Target Frame: map
+      Distance: 11.5
+      Pitch: 1.56
+      Yaw: 1.55
+      Focal Point:
+        X: 0
+        Y: 0
+        Z: -0.35
+      Near Clip Distance: 0.01
+    Saved: null
+Window Geometry:
+  Displays:
+    collapsed: false
+  Navigation 2:
+    collapsed: false
+  QMainWindow State: 000000ff00000000fd00000002000000000000011800000320fc0200000002fb000000100044006900730070006c0061007900730100000000000002540000001700fffffffb00000018004e0061007600690067006100740069006f006e00200032010000025a000000c60000001700ffffff000000010000003e00000320fc0200000001fb0000000a005600690065007700730000000000000003200000001700ffffff000003e20000032000000004000000040000000800000008fc00000000
+  Width: 1280
+  Height: 800
+  X: 30
+  Y: 30
+  Hide Left Dock: false
+  Hide Right Dock: true
