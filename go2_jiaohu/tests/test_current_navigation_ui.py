@@ -17,6 +17,7 @@ from tests.test_dashboard_interaction import dashboard
 def existing_stack_by_default(monkeypatch):
     # UI tests must never discover or start the physical robot's stack.
     from go2_navigation import runtime_guard
+    monkeypatch.setattr(runtime_guard, 'navigation_network_error', lambda: '')
     monkeypatch.setattr(runtime_guard, 'conflicting_navigation_processes', lambda **kwargs: [9000])
 
 

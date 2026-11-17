@@ -110,7 +110,10 @@ controller_server:
     min_x_velocity_threshold: 0.001
     min_y_velocity_threshold: 0.001
     min_theta_velocity_threshold: 0.001
-    failure_tolerance: 0.3
+    # Wait at zero through a brief timestamp hold instead of abandoning the
+    # path. The independent 0.30/0.35 s localization/scan gates still stop
+    # motion immediately; sustained localization loss cancels the goal.
+    failure_tolerance: 1.2
     progress_checker_plugin: progress_checker
     goal_checker_plugins: [goal_checker]
     controller_plugins: [FollowPath, FollowPathMPPI]

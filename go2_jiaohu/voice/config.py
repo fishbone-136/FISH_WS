@@ -153,6 +153,21 @@ WHISPER_RESCUE_MIN_LANGUAGE_PROB = float(
 WHISPER_RESCUE_MAX_NO_SPEECH_PROB = float(
     os.environ.get("WHISPER_RESCUE_MAX_NO_SPEECH_PROB", "0.45")
 )
+# 触发复核和接受复核是两个门限：不能用主模型较宽松的门限接受复核结果。
+WHISPER_RESCUE_ACCEPT_MIN_AVG_LOGPROB = float(
+    os.environ.get("WHISPER_RESCUE_ACCEPT_MIN_AVG_LOGPROB", "-0.45")
+)
+WHISPER_RESCUE_ACCEPT_MAX_NO_SPEECH_PROB = float(
+    os.environ.get("WHISPER_RESCUE_ACCEPT_MAX_NO_SPEECH_PROB", "0.45")
+)
+WHISPER_RESCUE_LANGUAGE_LOCK_PROB = float(
+    os.environ.get("WHISPER_RESCUE_LANGUAGE_LOCK_PROB", "0.80")
+)
+WHISPER_RESCUE_VOCABULARY = os.environ.get(
+    "WHISPER_RESCUE_VOCABULARY", os.path.join(PROJECT_DIR, "config", "asr_vocabulary.json")
+).strip()
+if WHISPER_RESCUE_VOCABULARY and not os.path.isabs(WHISPER_RESCUE_VOCABULARY):
+    WHISPER_RESCUE_VOCABULARY = os.path.join(PROJECT_DIR, WHISPER_RESCUE_VOCABULARY)
 # 动作口令采用比闲聊更严格的声学门限；清晰口令仍只跑 small，只有边界结果
 # 才交给 turbo 复核。
 WHISPER_COMMAND_RESCUE_MIN_AVG_LOGPROB = float(

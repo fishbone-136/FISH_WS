@@ -398,7 +398,7 @@ void imu_cbk(const sensor_msgs::msg::Imu::UniquePtr msg_in)
 
 double lidar_mean_scantime = 0.0;
 int    scan_num = 0;
-bool sync_packages(MeasureGroup &meas)
+bool sync_packages(MeasureGroup &meas,double current_time,double max_age,double max_scan_duration)
 {
     std::lock_guard<std::mutex> lock(mtx_buffer);
     if (lidar_buffer.empty() || imu_buffer.empty()) {
@@ -466,6 +466,15 @@ bool sync_packages(MeasureGroup &meas)
 
     if (last_timestamp_imu < lidar_end_time)
     {
+        return false;
+    }
+
+    if (fast_lio_guard::stale_scan(meas.lidar_beg_time,meas.lidar_end_time,
+        current_time,max_age,max_scan_duration))
+    {
+        // Do not consume IMU for a scan that cannot be used. The next fresh
+        // scan needs all intervening samples for continuous propagation.
+        lidar_buffer.pop_front();time_buffer.pop_front();lidar_pushed=false;
         return false;
     }
 
@@ -1222,7 +1231,7 @@ public:
 private:
     void timer_callback()
     {
-        if(sync_packages(Measures))
+        if(sync_packages(Measures,now().seconds(),input_max_age_,input_max_scan_duration_))
         {
             if (!input_is_healthy()) {
                 return;
@@ -1600,6 +1609,20 @@ private:
             last_processed_imu_stamp_, input_max_age_, input_max_imu_gap_,
             input_max_scan_duration_);
         if (reason != nullptr) {
+            if (fast_lio_guard::stale_scan(Measures.lidar_beg_time,Measures.lidar_end_time,
+                now().seconds(),input_max_age_,input_max_scan_duration_))
+            {
+                // Handle a scheduling pause between synchronization and this
+                // guard too. No old LiDAR is integrated/published and the IMU
+                // prefix is restored under the same lock as sensor callbacks.
+                {
+                    std::lock_guard<std::mutex> lock(mtx_buffer);
+                    fast_lio_guard::restore_unprocessed_imu(imu_buffer,Measures.imu);
+                }
+                RCLCPP_WARN_THROTTLE(get_logger(),*get_clock(),3000,
+                    "Dropped stale LiDAR frame; IMU retained for the next fresh scan");
+                return false;
+            }
             if (ikdtree.Root_Node != nullptr) {
                 RCLCPP_FATAL(get_logger(),
                     "FAST-LIO input safety trip: %s; scan=[%.6f, %.6f] "

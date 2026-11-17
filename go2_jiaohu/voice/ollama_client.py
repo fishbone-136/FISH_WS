@@ -113,7 +113,8 @@ class OllamaClient:
             "keep_alive": config.OLLAMA_KEEP_ALIVE,
             "options": {
                 "temperature": 0.0,
-                "num_ctx": min(config.OLLAMA_CONTEXT_LENGTH, 1024),
+                # 与正式请求使用相同缓存大小，避免首轮重新加载 runner。
+                "num_ctx": config.OLLAMA_CONTEXT_LENGTH,
                 "num_predict": 1,
             },
         }

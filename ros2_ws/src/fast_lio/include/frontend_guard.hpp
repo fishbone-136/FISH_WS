@@ -8,6 +8,21 @@
 
 namespace fast_lio_guard
 {
+// An old, otherwise well-timed scan is backlog, not estimator divergence.
+// Discard it without integrating it; preserve IMU for the next fresh scan.
+inline bool stale_scan(double begin,double end,double now,double max_age,double max_duration)
+{
+  return std::isfinite(begin) && std::isfinite(end) && std::isfinite(now) &&
+         end>begin && end-begin<=max_duration && now-end>max_age;
+}
+
+template<typename Buffer,typename Samples>
+inline void restore_unprocessed_imu(Buffer & buffer,Samples & samples)
+{
+  buffer.insert(buffer.begin(),samples.begin(),samples.end());
+  samples.clear();
+}
+
 // HAP already supplies per-point time. A short frame must never borrow the
 // mean duration: doing so consumes IMU samples belonging to the next frame.
 inline double scan_duration(double point_duration, double mean_duration, bool timed_hap)

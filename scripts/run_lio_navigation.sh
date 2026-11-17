@@ -4,14 +4,13 @@ set -euo pipefail
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 source "${script_dir}/env.sh"
 
-if ! ip link show "${GO2_NETWORK_INTERFACE}" >/dev/null 2>&1; then
-  echo "Go2 网卡不存在: ${GO2_NETWORK_INTERFACE}" >&2
-  exit 2
-fi
-if ! ip route get "${GO2_IP}" | grep -q "dev ${GO2_NETWORK_INTERFACE}"; then
-  echo "${GO2_IP} 未通过 ${GO2_NETWORK_INTERFACE} 路由，拒绝启动底盘控制。" >&2
-  exit 2
-fi
+/usr/bin/python3 - <<'PY'
+from go2_navigation.runtime_guard import navigation_network_error
+error = navigation_network_error()
+if error:
+    print('导航未启动：' + error, flush=True)
+    raise SystemExit(2)
+PY
 
 # A low-mounted HAP can lose most useful geometry when Go2 lies down.
 # Check actual feedback before starting any navigation/base nodes. Explicit

@@ -2,6 +2,7 @@ import json
 import unittest
 from unittest.mock import Mock
 
+from voice import config
 from voice.ollama_client import OllamaClient
 
 
@@ -43,6 +44,27 @@ class OllamaClientTests(unittest.TestCase):
         self.assertEqual(payload["model"], "qwen2.5:3b")
         self.assertEqual(payload["options"]["num_predict"], 42)
         self.assertFalse(payload["stream"])
+
+    def test_warmup_and_chat_reuse_same_model_context_and_keep_alive(self):
+        payloads = []
+        client = OllamaClient(model="qwen2.5:3b")
+        client.resolve_model = Mock(return_value="qwen2.5:3b")
+
+        def request(method, path, payload):
+            payloads.append(payload)
+            return {"message": {"content": "你好"}}
+
+        client._request = request
+        client.warm_up()
+        client.chat([{"role": "user", "content": "你好"}],
+                    max_tokens=config.OLLAMA_CHAT_MAX_PREDICT)
+        warmup, chat = payloads
+        for key in ("model", "keep_alive"):
+            self.assertEqual(warmup[key], chat[key])
+        self.assertEqual(warmup["options"]["num_ctx"], chat["options"]["num_ctx"])
+        self.assertEqual(chat["options"]["num_ctx"], config.OLLAMA_CONTEXT_LENGTH)
+        self.assertEqual(warmup["options"]["num_predict"], 1)
+        self.assertEqual(chat["options"]["num_predict"], config.OLLAMA_CHAT_MAX_PREDICT)
 
 
 if __name__ == "__main__":

@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 import sys
 import time
+from functools import lru_cache
 
 from . import config
 from .command_safety import (
@@ -49,11 +51,110 @@ def _has_credible_speech(segments) -> bool:
 
 
 def _quality_stats(segments) -> tuple[float, float]:
-    """Return the strongest speech log-probability and lowest silence probability."""
-    return (
-        max((segment.avg_logprob for segment in segments), default=-99.0),
-        min((segment.no_speech_prob for segment in segments), default=1.0),
-    )
+    """整句按 token 数加权；不能用一个好片段掩盖其余片段的低置信度。"""
+    weighted = [(segment, max(1, len(getattr(segment, "tokens", ()))))
+                for segment in segments]
+    if not weighted:
+        return -99.0, 1.0
+    return (sum(segment.avg_logprob * weight for segment, weight in weighted)
+            / sum(weight for _, weight in weighted),
+            max(segment.no_speech_prob for segment, _ in weighted))
+
+
+@lru_cache(maxsize=4)
+def _load_rescue_vocabulary(path: str) -> tuple:
+    if not path:
+        return ()
+    try:
+        with open(path, encoding="utf-8") as stream:
+            entries = json.load(stream)
+        if not isinstance(entries, list):
+            raise ValueError("词表必须是数组")
+        result = []
+        for entry in entries:
+            term, language, aliases = entry["term"], entry["language"], entry.get("aliases", [])
+            if (not isinstance(term, str) or not 1 <= len(term) <= 40
+                    or language not in {"zh", "en"} or not isinstance(aliases, list)
+                    or any(not isinstance(alias, str) or not 1 <= len(alias) <= 40
+                           for alias in aliases)):
+                raise ValueError("词表条目格式无效")
+            result.append((term, language, tuple(aliases)))
+        return tuple(result)
+    except (OSError, ValueError, TypeError, KeyError) as exc:
+        print(f"ASR 复核词表不可用，继续声学复核: {exc}", file=sys.stderr, flush=True)
+        return ()
+
+
+def _contains_term(text: str, term: str, language: str) -> bool:
+    if language == "en":
+        return bool(re.search(r"(?<!\w)" + re.escape(term) + r"(?!\w)", text, re.I))
+    return term in text
+
+
+def _rescue_vocabulary_matches(text: str, language: str) -> tuple:
+    # 词表只决定本轮解码提示；绝不在最终文本里直接替换同音词。
+    matches = []
+    for term, lang, aliases in _load_rescue_vocabulary(config.WHISPER_RESCUE_VOCABULARY):
+        if lang == language and any(_contains_term(text, value, lang)
+                                   for value in (term, *aliases)):
+            matches.append((term, lang, not _contains_term(text, term, lang)))
+        if len(matches) >= 4:
+            break
+    return tuple(matches)
+
+
+def _rescue_language(info, command_rescue: bool = False) -> str | None:
+    if config.WHISPER_LANGUAGE != "auto":
+        return config.WHISPER_LANGUAGE
+    language = getattr(info, "language", "")
+    if language in {"zh", "en"} and (
+        command_rescue or getattr(info, "language_probability", 0.0)
+        >= config.WHISPER_RESCUE_LANGUAGE_LOCK_PROB
+    ):
+        return language
+    return None
+
+
+def _rescue_quality_rejection(segments, info, expected_language: str | None) -> str:
+    avg_logprob, no_speech_prob = _quality_stats(segments)
+    if (not segments or not math.isfinite(avg_logprob) or not math.isfinite(no_speech_prob)
+            or any(not math.isfinite(s.avg_logprob) or not math.isfinite(s.no_speech_prob)
+                   or s.avg_logprob < config.WHISPER_MIN_AVG_LOGPROB
+                   or s.no_speech_prob > config.WHISPER_RESCUE_ACCEPT_MAX_NO_SPEECH_PROB
+                   for s in segments)
+            or avg_logprob < config.WHISPER_RESCUE_ACCEPT_MIN_AVG_LOGPROB
+            or no_speech_prob > config.WHISPER_RESCUE_ACCEPT_MAX_NO_SPEECH_PROB):
+        return "rescue_low_confidence"
+    if expected_language and getattr(info, "language", "") != expected_language:
+        return "rescue_language_mismatch"
+    return ""
+
+
+def _review_rescue(primary_text, rescue_text, segments, info,
+                   expected_language=None, vocabulary_matches=()) -> tuple[str, str, str]:
+    """保留动作一致性检查，再检查声学质量与本轮专名是否得到确认。"""
+    selected, decision = _choose_rescue_text(primary_text, rescue_text)
+    if decision == "command_disagreement":
+        return "", decision, decision
+    rejection = _rescue_quality_rejection(segments, info, expected_language)
+    if rejection:
+        return "", "rejected_rescue", rejection
+    if decision.startswith("kept_primary_"):
+        return selected, decision, ""
+    # 热词只是解码提示。若整句退化成只输出提示词，不能把提示回声当成纠正。
+    hint_text = "".join(term for term, _, _ in vocabulary_matches)
+    primary_compact = re.sub(r"[^\w\u4e00-\u9fff]+", "", primary_text.casefold())
+    rescue_compact = re.sub(r"[^\w\u4e00-\u9fff]+", "", rescue_text.casefold())
+    hint_compact = re.sub(r"[^\w\u4e00-\u9fff]+", "", hint_text.casefold())
+    if (hint_text and rescue_compact == hint_compact
+            and len(primary_compact) > len(hint_compact) + 2):
+        return "", "rejected_rescue", "rescue_prompt_echo"
+    for term, language, was_alias in vocabulary_matches:
+        if not _contains_term(rescue_text, term, language):
+            if not was_alias:
+                return primary_text, "kept_primary_vocabulary", ""
+            return "", "rejected_rescue", "rescue_unresolved_vocabulary"
+    return selected, decision, ""
 
 
 _COMMON_SUBTITLE_HALLUCINATIONS = (
@@ -306,6 +407,7 @@ def _rescue_reason(segments, info, text: str) -> str:
         # Do not spend several seconds running a second model on silence/noise.
         return ""
     avg_logprob, no_speech_prob = _quality_stats(segments)
+    weak_segment = any(s.avg_logprob < config.WHISPER_MIN_AVG_LOGPROB for s in segments)
     if _is_suspicious_transcript(text):
         return "疑似字幕幻觉"
     if _is_fast_safety_stop(text):
@@ -319,6 +421,7 @@ def _rescue_reason(segments, info, text: str) -> str:
             avg_logprob < config.WHISPER_COMMAND_RESCUE_MIN_AVG_LOGPROB
             or no_speech_prob > config.WHISPER_COMMAND_RESCUE_MAX_NO_SPEECH_PROB
             or language_probability < config.WHISPER_COMMAND_RESCUE_MIN_LANGUAGE_PROB
+            or weak_segment
         ):
             return "运动指令声学置信度复核"
         return ""
@@ -326,6 +429,12 @@ def _rescue_reason(segments, info, text: str) -> str:
         # 例如现场出现的“执行秘密，校前走两步”。它不能直接打开安全门，但需要
         # 让 turbo 尝试恢复成“执行命令，向前走两步”。复核后仍须重新通过门控。
         return "疑似运动口令复核"
+    if any(was_alias for _, _, was_alias in _rescue_vocabulary_matches(
+        text, getattr(info, "language", "")
+    )):
+        return "专名候选复核"
+    if weak_segment:
+        return "片段置信度偏低"
     if avg_logprob < config.WHISPER_RESCUE_MIN_AVG_LOGPROB:
         return "语音置信度偏低"
     if no_speech_prob > config.WHISPER_RESCUE_MAX_NO_SPEECH_PROB:
@@ -516,6 +625,7 @@ def main() -> int:
         *,
         language_override: str | None = None,
         initial_prompt: str | None = None,
+        hotwords_override: str | None = None,
     ):
         language = language_override
         if language is None:
@@ -536,7 +646,8 @@ def main() -> int:
             # Jetson ARM64 环境的 native assertion。
             vad_filter=False,
             condition_on_previous_text=False,
-            hotwords=config.WHISPER_HOTWORDS or None,
+            hotwords=(config.WHISPER_HOTWORDS if hotwords_override is None
+                      else hotwords_override) or None,
             initial_prompt=initial_prompt,
         )
         return list(segment_iter), info
@@ -571,6 +682,7 @@ def main() -> int:
                 credible = False
                 text = ""
             primary_text = text
+            primary_avg_logprob, primary_no_speech_prob = _quality_stats(segments)
             rescue_reason = _rescue_reason(segments, info, text)
             rescue_attempted = False
             rescue_applied = False
@@ -579,6 +691,10 @@ def main() -> int:
             rescue_rejection_reason = ""
             rescue_load_seconds = 0.0
             rescue_decode_seconds = 0.0
+            rescue_language = None
+            rescue_hint = ""
+            rescue_avg_logprob = None
+            rescue_no_speech_prob = None
 
             if rescue_allowed and not rescue_disabled and rescue_reason:
                 rescue_attempted = True
@@ -600,56 +716,58 @@ def main() -> int:
                         rescue_load_seconds = time.monotonic() - rescue_load_started
                     rescue_started = time.monotonic()
                     _send({"status": "progress", "stage": "rescue_decode", "primary_seconds": round(primary_seconds, 3), "rescue_reason": rescue_reason})
-                    rescue_language = getattr(info, "language", "")
-                    if rescue_language not in {"zh", "en"}:
-                        rescue_language = None
                     command_rescue = rescue_reason in {
                         "运动指令声学置信度复核", "疑似运动口令复核",
                     }
+                    rescue_language = _rescue_language(info, command_rescue)
+                    vocabulary_matches = (() if command_rescue else
+                        _rescue_vocabulary_matches(text, getattr(info, "language", "")))
+                    rescue_hint = "、".join(term for term, _, _ in vocabulary_matches)
                     rescue_segments, rescue_info = transcribe_once(
                         rescue_model,
                         wav_path,
                         config.WHISPER_RESCUE_BEAM_SIZE,
                         config.WHISPER_RESCUE_BEST_OF,
-                        language_override=rescue_language if command_rescue else None,
+                        language_override=rescue_language,
                         initial_prompt=(
                             _command_rescue_prompt(rescue_language or "zh")
                             if command_rescue else None
                         ),
+                        hotwords_override=rescue_hint,
                     )
                     rescue_decode_seconds = time.monotonic() - rescue_started
+                    rescue_avg_logprob, rescue_no_speech_prob = _quality_stats(rescue_segments)
                     rescue_credible = _has_credible_speech(rescue_segments)
-                    rescue_text = (
-                        "".join(segment.text for segment in rescue_segments).strip()
-                        if rescue_credible
-                        else ""
-                    )
+                    rescue_text = "".join(segment.text for segment in rescue_segments).strip()
                     rescue_text, rescue_stripped_hallucination, rescue_rejection = (
                         _sanitize_transcript(
                             rescue_text, getattr(rescue_info, "language", "")
                         )
                     )
                     rescue_candidate_text = rescue_text
-                    if rescue_stripped_hallucination:
-                        stripped_hallucination = rescue_stripped_hallucination
+                    if not rescue_rejection and _should_filter_suspicious(rescue_segments, rescue_text):
+                        rescue_rejection = "rescue_suspicious_transcript"
+                    if (not rescue_credible or not rescue_text) and not rescue_rejection:
+                        rescue_rejection = "rescue_low_confidence"
                     if rescue_rejection:
-                        rescue_rejection_reason = rescue_rejection
-                    if rescue_rejection or not rescue_text:
-                        rescue_credible = False
-                    if rescue_text and not _should_filter_suspicious(
-                        rescue_segments, rescue_text
-                    ):
-                        selected_text, rescue_decision = _choose_rescue_text(
-                            text, rescue_text
+                        text, credible = "", False
+                        rescue_decision = "rejected_rescue"
+                        rejection_reason = rescue_rejection_reason = rescue_rejection
+                    else:
+                        selected_text, rescue_decision, rescue_rejection_reason = _review_rescue(
+                            text, rescue_text, rescue_segments, rescue_info,
+                            rescue_language, vocabulary_matches,
                         )
-                        if selected_text == rescue_text:
+                        if selected_text and selected_text == rescue_text:
                             segments = rescue_segments
                             info = rescue_info
                             rescue_applied = True
+                            if rescue_stripped_hallucination:
+                                stripped_hallucination = rescue_stripped_hallucination
                         text = selected_text
                         credible = bool(text)
-                        if rescue_decision == "command_disagreement":
-                            rejection_reason = "command_disagreement"
+                        if rescue_rejection_reason:
+                            rejection_reason = rescue_rejection_reason
                 except Exception as rescue_error:
                     # Primary-model text remains usable; disable repeated load
                     # attempts for this worker so one deployment issue cannot add delay.
@@ -678,6 +796,12 @@ def main() -> int:
                 "hallucination_stripped": stripped_hallucination,
                 "rejection_reason": rejection_reason,
                 "rescue_rejection_reason": rescue_rejection_reason,
+                "primary_avg_logprob": primary_avg_logprob,
+                "primary_no_speech_prob": primary_no_speech_prob,
+                "rescue_avg_logprob": rescue_avg_logprob,
+                "rescue_no_speech_prob": rescue_no_speech_prob,
+                "rescue_language": rescue_language,
+                "rescue_hint": rescue_hint,
                 "primary_seconds": round(primary_seconds, 3),
                 "rescue_load_seconds": round(rescue_load_seconds, 3),
                 "rescue_decode_seconds": round(rescue_decode_seconds, 3),

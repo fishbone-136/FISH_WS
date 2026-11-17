@@ -276,6 +276,11 @@ class RvizView(QWidget):
     def start(self):
         if self._process.state() != QProcess.NotRunning:
             return
+        from go2_navigation.runtime_guard import navigation_network_error
+        network_error = navigation_network_error()
+        if network_error:
+            self._show_error(network_error)
+            return
         if QGuiApplication.platformName() != 'xcb':
             self._show_error('RViz 嵌入需要 X11。请用 QT_QPA_PLATFORM=xcb bash scripts/run_ui.sh 启动。')
             return

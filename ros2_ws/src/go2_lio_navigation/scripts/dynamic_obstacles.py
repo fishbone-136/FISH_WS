@@ -2,6 +2,9 @@
 import math
 import numpy as np
 from scipy.ndimage import label
+from scipy.spatial import cKDTree
+from scipy.sparse import csr_matrix
+from scipy.sparse.csgraph import connected_components
 
 
 def cells_in_bounds(memory, lo, hi, resolution):
@@ -176,3 +179,31 @@ class DynamicObstacles:
 
     def flags(self,keys):
         return np.fromiter((k in self.dynamic_cells for k in keys),bool,count=len(keys))
+
+    def transient_flags(self,keys,memory):
+        """Group short-lived fragments; never expire geometry or a sparse landmark.
+
+        Flags permit repeated measured-ground visibility with the normal
+        eight-observation rule, rather than declaring these objects moving.
+        """
+        result=np.zeros(len(keys),dtype=bool)
+        candidates=[]
+        for i,key in enumerate(keys):
+            history=self.support_history.get(key)
+            if (key not in self.static_confirmed and history is not None and
+                    history[1]-history[0]<=.60 and history[2]<6 and key in memory):
+                candidates.append(i)
+        if len(candidates)<4:return result
+        xy=np.asarray([memory[keys[i]][:2] for i in candidates])
+        # Use measured distances: float32 returns either side of zero can
+        # acquire nonadjacent integer bins despite being only 10 cm apart.
+        pairs=cKDTree(xy).query_pairs(.12,output_type='ndarray')
+        graph=csr_matrix((np.ones(len(pairs),dtype=bool),(pairs[:,0],pairs[:,1])),
+                         shape=(len(xy),len(xy)))
+        _,identities=connected_components(graph,directed=False)
+        candidates=np.asarray(candidates)
+        for identity in np.unique(identities):
+            selected=np.flatnonzero(identities==identity)
+            if len(selected)>=4 and np.max(np.ptp(xy[selected],axis=0))>=.15:
+                result[candidates[selected]]=True
+        return result

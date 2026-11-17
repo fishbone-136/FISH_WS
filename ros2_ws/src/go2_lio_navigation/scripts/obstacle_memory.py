@@ -128,7 +128,7 @@ def world_ground_plane(message,transform):
 
 
 def compute_clearing_delta(geometry,stamp,previous_stamp,pose,cloud,transform,clear_window,
-                           ground_plane=None,dynamic_flags=None):
+                           ground_plane=None,dynamic_flags=None,transient_flags=None):
     """Transfer compact numeric geometry in and sparse confirmation changes out."""
     started=time.perf_counter()
     points,origin=cloud_points(cloud,transform)
@@ -138,8 +138,10 @@ def compute_clearing_delta(geometry,stamp,previous_stamp,pose,cloud,transform,cl
     bx=c*delta[:,0]+s*delta[:,1];by=-s*delta[:,0]+c*delta[:,1]
     points=points[(np.abs(bx)>=.40)|(np.abs(by)>=.24)]
     updates=clearing_delta(geometry,RayEvidence(points,origin),pose,stamp,previous_stamp,
-                           clear_window=clear_window,ground_plane=ground_plane,
-                           dynamic_flags=dynamic_flags)
+                           # The parent checks sensor continuity; this gap is
+                           # between background jobs, bounded by the evidence window.
+                           clear_window=clear_window,max_gap=clear_window,ground_plane=ground_plane,
+                           dynamic_flags=dynamic_flags,transient_flags=transient_flags)
     return updates,1000*(time.perf_counter()-started)
 
 
@@ -162,6 +164,13 @@ class RememberedObstacles(Node):
         self.memory_publish_rate=float(self.declare_parameter('memory_publish_rate',15.).value)
         self.navigation_publish_rate=float(self.declare_parameter('navigation_publish_rate',10.).value)
         self.clearing_rate=float(self.declare_parameter('clearing_rate',6.).value)
+        # A worker result is a timestamped geometric observation, not current
+        # motion permission. Allow bounded computation/dispatch latency; the
+        # merge still rejects every cell hit again after its snapshot.
+        self.clearing_result_max_age=float(self.declare_parameter(
+            'clearing_result_max_age',1.5).value)
+        if not .60<=self.clearing_result_max_age<clear_window:
+            raise ValueError('Clearing result age must be below the confirmation window')
         if any(not math.isfinite(v) or v<=0. for v in (
                 self.memory_publish_rate,self.navigation_publish_rate,self.clearing_rate)):
             raise ValueError('Memory publication and clearing rates must be finite and positive')
@@ -202,13 +211,19 @@ class RememberedObstacles(Node):
         self.clearing_context=None
         self.clearing_keys=None
         self.last_clearing_stamp=-math.inf
+        self.last_observation_stamp=-math.inf
+        self.clearing_reset_stamp=-math.inf
+        self.clearing_observation_resets=0
+        self.last_clearing_result_age=None
         self.next_clearing=0.
         self.last_prune=0.
         self.processed=deque(maxlen=8)
         self.fast_processing_ms=self.max_fast_processing_ms=0.
+        self.tracking_processing_ms=0.
         self.stale_clearing_results=0
         self.clearing_jobs=0
         self.clearing_candidates=0
+        self.transient_clearing_candidates=0
         self.clearing_removed=0
         latched = QoSProfile(depth=1,durability=DurabilityPolicy.TRANSIENT_LOCAL)
         self.points_pub = self.create_publisher(PointCloud2,'/safety/remembered_obstacles',1)
@@ -231,7 +246,11 @@ class RememberedObstacles(Node):
         latest_cloud=QoSProfile(depth=1,reliability=ReliabilityPolicy.BEST_EFFORT)
         self.create_subscription(PointCloud2,observations,self.on_scan,latest_cloud)
         cloud_topic=self.declare_parameter('raw_cloud_topic','/cloud_registered_body').value
-        self.create_subscription(PointCloud2,cloud_topic,self.on_cloud,latest_cloud)
+        # This callback only caches messages. Retain a short DDS queue so
+        # occupied processing cannot drop the exact raw frame needed to pair
+        # an independently projected observation for geometric clearing.
+        raw_cloud_qos=QoSProfile(depth=8,reliability=ReliabilityPolicy.BEST_EFFORT)
+        self.create_subscription(PointCloud2,cloud_topic,self.on_cloud,raw_cloud_qos)
         ground_topic=self.declare_parameter('ground_plane_topic','/perception/deskewed_ground_plane').value
         self.create_subscription(PoseStamped,ground_topic,self.on_ground_plane,latest_cloud)
         # The bridge publishes this full 6-DoF pose only after the same health,
@@ -240,7 +259,10 @@ class RememberedObstacles(Node):
         # while fresh accepted poses and obstacle endpoints are available.
         full_pose_topic=self.declare_parameter('full_pose_topic','/Odometry_validated').value
         self.validated_pose_source=full_pose_topic == '/Odometry_validated'
-        self.create_subscription(Odometry,full_pose_topic,self.on_full_pose,16)
+        # The internal timestamp cache retains received poses for pairing.
+        # A separate DDS backlog of 16 poses can keep callbacks processing old
+        # frames until the newest matching obstacle scan has already expired.
+        self.create_subscription(Odometry,full_pose_topic,self.on_full_pose,1)
         self.create_subscription(Bool,'/lio/localization_valid',
             lambda m:setattr(self,'localized',m.data),latched)
         # Occupied writes track the 15 Hz scan; slow 3-D clearing cannot block
@@ -291,7 +313,10 @@ class RememberedObstacles(Node):
         key=(msg.header.stamp.sec,msg.header.stamp.nanosec)
         if key not in self.clouds:self.cloud_order.append(key)
         self.clouds[key]=msg
-        while len(self.cloud_order)>8:
+        # Keep paired rays through the bounded clearing dispatch latency.
+        # Eight raw frames could expire while the occupied/tracking callbacks
+        # were still processing the matching observation.
+        while len(self.cloud_order)>16:
             self.clouds.pop(self.cloud_order.popleft(),None)
 
     def on_ground_plane(self,msg):
@@ -307,6 +332,12 @@ class RememberedObstacles(Node):
         if key not in self.full_poses:self.pose_order.append(key)
         self.full_poses[key]=msg
         while len(self.pose_order)>16:self.full_poses.pop(self.pose_order.popleft(),None)
+        stamp=msg.header.stamp.sec+msg.header.stamp.nanosec/1.e9
+        age=self.get_clock().now().nanoseconds/1.e9-stamp
+        if -.05<=age<=.35:
+            # Sensor continuity belongs to the validated pose stream, not the
+            # smaller subset of scans selected by the occupied-write worker.
+            self.record_observation_continuity(stamp)
         self.process()
 
     def observation_transform(self,header):
@@ -322,7 +353,9 @@ class RememberedObstacles(Node):
                 updates,elapsed=self.clearing.result()
                 self.last_processing_ms=elapsed
                 self.max_processing_ms=max(self.max_processing_ms,elapsed)
-                if -.05<=self.get_clock().now().nanoseconds/1.e9-stamp<=.60:
+                self.last_clearing_result_age=self.get_clock().now().nanoseconds/1.e9-stamp
+                if (-.05<=self.last_clearing_result_age<=self.clearing_result_max_age and
+                        stamp>=self.clearing_reset_stamp):
                     cleared=[]
                     removed=self.memory.merge_delta(snapshot,self.clearing_keys,
                         *updates,stamp,cleared_cells=cleared)
@@ -332,6 +365,8 @@ class RememberedObstacles(Node):
                         self.geometry=None
                         self.motion.prune(self.memory.cells)
                         self.publish_clear_volumes(cleared,self.clearing_ground,stamp)
+                        self.publish_points()
+                        self.publish_maps()
                     self.clearing_jobs+=1
                     self.last_clearing_stamp=stamp
                 else:self.stale_clearing_results+=1
@@ -345,10 +380,15 @@ class RememberedObstacles(Node):
         now=self.get_clock().now().nanoseconds/1.e9
         for scan,pose in reversed(self.processed):
             stamp=scan.header.stamp.sec+scan.header.stamp.nanosec/1.e9
-            if stamp<=self.last_clearing_stamp or not -.05<=now-stamp<=.35:continue
-            # A fresh conservative cloud is evidence of occupied endpoints,
-            # never evidence that an old obstacle or the floor is now free.
-            if any(f.name=='positive_only' for f in scan.fields):continue
+            # Geometric clearing is not motion permission. Its result still
+            # expires at clearing_result_max_age and cannot erase a newer hit.
+            # The old 350 ms dispatch cutoff starved every job after normal
+            # projection, pairing and tracking latency under navigation load.
+            if stamp<=self.last_clearing_stamp or not -.05<=now-stamp<=min(.75,self.clearing_result_max_age):continue
+            # Missing measured ground forbids floor/column inference, not
+            # genuine free 3-D beam segments in the paired raw cloud. Infinity
+            # and projected/expanded endpoints are never used as ray proof.
+            positive_only=any(f.name=='positive_only' for f in scan.fields)
             cloud=self.clouds.get((scan.header.stamp.sec,scan.header.stamp.nanosec))
             if cloud is None:continue
             try:
@@ -368,7 +408,8 @@ class RememberedObstacles(Node):
             self.clearing_context=(snapshot,stamp)
             self.clearing_keys=list(snapshot)
             ground=None
-            plane=self.ground_planes.get((scan.header.stamp.sec,scan.header.stamp.nanosec))
+            plane=(None if positive_only else
+                   self.ground_planes.get((scan.header.stamp.sec,scan.header.stamp.nanosec)))
             if plane is not None:
                 try:ground=world_ground_plane(plane,self.observation_transform(plane.header))
                 except Exception:ground=None
@@ -377,9 +418,18 @@ class RememberedObstacles(Node):
             geometry=np.fromiter(chain.from_iterable(snapshot.values()),dtype=float,
                                  count=7*len(snapshot)).reshape(-1,7)
             try:
+                # Worker scheduling gaps do not imply missing sensor data.
+                # Reset only after an actual accepted-observation gap. The
+                # per-cell confirmation window still bounds sparse evidence.
+                previous_stamp=(self.last_clearing_stamp
+                                if self.last_clearing_stamp>=self.clearing_reset_stamp
+                                else -math.inf)
+                transient=(self.motion.transient_flags(self.clearing_keys,snapshot)
+                           if ground is not None else np.zeros(len(snapshot),dtype=bool))
+                self.transient_clearing_candidates=int(np.count_nonzero(transient))
                 self.clearing=self.worker.submit(compute_clearing_delta,geometry,stamp,
-                    self.last_clearing_stamp,pose,cloud,transform,self.memory.clear_window,ground,
-                    self.motion.flags(self.clearing_keys))
+                    previous_stamp,pose,cloud,transform,self.memory.clear_window,ground,
+                    self.motion.flags(self.clearing_keys),transient)
             except BrokenProcessPool as exc:
                 self.fail_clearing_worker(exc)
             self.next_clearing=time.monotonic()+1./self.clearing_rate
@@ -449,15 +499,13 @@ class RememberedObstacles(Node):
             try:
                 started=time.perf_counter()
                 points,_=cloud_points(scan,tf)
-                self.motion.observe(points,pose,stamp,self.memory.cells)
+                # Preserve the pre-hit view for tracking, but publish occupied
+                # protection before clustering/motion classification. Tracking
+                # only relaxes subsequent clearing; it must not delay new hits.
+                tracking_memory=self.memory.cells.copy()
                 accepted=self.memory.mark_xyz(points,pose,stamp)
                 self.geometry = None
                 self.raw_paired=(scan.header.stamp.sec,scan.header.stamp.nanosec) in self.clouds
-                if time.monotonic()-self.last_prune>=1.:
-                    self.memory.cells={k:p for k,p in self.memory.cells.items()
-                        if (p[0]-pose[0])**2+(p[1]-pose[1])**2<=self.memory.radius**2}
-                    self.motion.prune(self.memory.cells)
-                    self.last_prune=time.monotonic()
                 self.fast_processing_ms=1000*(time.perf_counter()-started)
                 self.max_fast_processing_ms=max(self.max_fast_processing_ms,self.fast_processing_ms)
             except Exception as exc:
@@ -476,8 +524,29 @@ class RememberedObstacles(Node):
                 # Send new protection evidence immediately rather than wait
                 # for another timer turn behind clouds, maps and TF callbacks.
                 self.publish_points()
+                try:
+                    tracking_started=time.perf_counter()
+                    self.motion.observe(points,pose,stamp,tracking_memory)
+                    if time.monotonic()-self.last_prune>=1.:
+                        self.memory.cells={k:p for k,p in self.memory.cells.items()
+                            if (p[0]-pose[0])**2+(p[1]-pose[1])**2<=self.memory.radius**2}
+                        self.geometry=None
+                        self.motion.prune(self.memory.cells)
+                        self.last_prune=time.monotonic()
+                    self.tracking_processing_ms=1000*(time.perf_counter()-tracking_started)
+                except Exception as exc:
+                    self.fault=str(exc)
+                    self.get_logger().error(self.fault)
+                    self.publish_points()
+                    return
             self.pending.popleft()
             return
+
+    def record_observation_continuity(self,stamp):
+        if stamp-self.last_observation_stamp>self.memory.max_observation_gap:
+            self.clearing_reset_stamp=stamp
+            self.clearing_observation_resets+=1
+        self.last_observation_stamp=stamp
 
     def geometry_snapshot(self):
         if self.geometry is None:
@@ -570,12 +639,18 @@ class RememberedObstacles(Node):
             'navigation_publish_rate':self.navigation_publish_rate,
             'clearing_rate':self.clearing_rate,
             'clearing_confirmation_window':self.memory.clear_window,
+            'clearing_result_max_age':self.clearing_result_max_age,
+            'last_clearing_result_age':self.last_clearing_result_age,
+            'clearing_observation_resets':self.clearing_observation_resets,
             'clearing_jobs':self.clearing_jobs,'clearing_candidates':self.clearing_candidates,
+            'transient_clearing_policy':'grouped_ground_evidence_v1',
+            'transient_clearing_candidates':self.transient_clearing_candidates,
             'clearing_removed_cells':self.clearing_removed,
             'processing_ms':round(self.last_processing_ms,3),
             'max_processing_ms':round(self.max_processing_ms,3),
             'fast_processing_ms':round(self.fast_processing_ms,3),
             'max_fast_processing_ms':round(self.max_fast_processing_ms,3),
+            'tracking_processing_ms':round(self.tracking_processing_ms,3),
             'clearing_busy':self.clearing is not None,
             'clearing_source_age':(self.get_clock().now().nanoseconds/1.e9-self.clearing_context[1]
                                    if self.clearing_context is not None else None),

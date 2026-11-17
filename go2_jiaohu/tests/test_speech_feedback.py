@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 import struct
 import logging
+import pytest
 
 from offline_test import speech_controller as speech
 
@@ -67,6 +68,54 @@ def test_rejected_speech_does_not_raise_microphone_gate():
     audio = speech.sr.AudioData(struct.pack('<h', 2000) * 48000, 16000, 2)
     controller._adjust_rejected_noise(audio)
     assert controller._recog.energy_threshold == 450
+
+
+@pytest.mark.parametrize("reason,message", [
+    ("rescue_unresolved_vocabulary", "地点名称没有识别清楚，请再说一次完整名称。"),
+    ("rescue_low_confidence", "两次识别未能确认这句话，请再说一次。"),
+    ("command_disagreement", "两次识别的动作或距离不一致，未执行。请重新说出完整指令。"),
+])
+def test_rejected_review_reports_reason_without_calling_llm(monkeypatch, caplog, reason, message):
+    controller = speech.SpeechController()
+    replies = []
+    controller.on_response = replies.append
+    audio = speech.sr.AudioData(struct.pack('<h', 2000) * 16000, 16000, 2)
+
+    class Microphone:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+    calls = []
+
+    def listen(*args, **kwargs):
+        if not calls:
+            calls.append(True)
+            return audio
+        controller._running = False
+        raise speech.sr.WaitTimeoutError()
+
+    def call_llm(text):
+        pytest.fail("未经确认的复核结果不能交给对话/动作处理")
+
+    controller._mic = Microphone()
+    controller._recog = SimpleNamespace(adjust_for_ambient_noise=lambda *a, **kw: None,
+                                       energy_threshold=450, listen=listen)
+    controller._asr = SimpleNamespace(start=lambda: None, runtime="fake",
+        transcribe_audio=lambda audio: ("", "zh"), last_result={
+            "rejection_reason": reason, "rescue_attempted": True,
+            "rescue_rejection_reason": reason, "primary_text": "大煙塔", "rescue_text": "大眼堂",
+        })
+    monkeypatch.setattr(controller, "_open_microphone", lambda: True)
+    monkeypatch.setattr(controller, "_start_background_warmup", lambda: None)
+    monkeypatch.setattr(controller, "_call_llm", call_llm)
+    controller._running = True
+    with caplog.at_level(logging.INFO):
+        controller._loop()
+    assert replies[-1] == message
+    assert "大煙塔" in caplog.text and "大眼堂" in caplog.text
 
 
 def test_runtime_log_persists_terminal_and_ui_messages(tmp_path, monkeypatch):

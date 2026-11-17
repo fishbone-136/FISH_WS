@@ -41,6 +41,21 @@ class GeometryCacheTests(unittest.TestCase):
             conditions[i] = False
             self.assertEqual(motion_stop_reason(*conditions), expected)
 
+    def test_numeric_geometry_is_reused_and_a_new_obstacle_invalidates_it(self):
+        cache=ObstacleGeometryCache()
+        scan=[(1.,.4)];memory=np.array([[.5,.3]])
+        pose=(0.,0.,0.)
+        cache.update(scan,memory,pose,True)
+        previous=cache.combined_array
+        np.testing.assert_array_equal(previous,cache.combined)
+        cache.update(scan,memory,pose,True)
+        self.assertIs(cache.combined_array,previous)
+        cache.update([(.2,.1)],memory,pose,True)
+        self.assertIsNot(cache.combined_array,previous)
+        np.testing.assert_array_equal(cache.combined_array,[[.2,.1],[.5,.3]])
+        cache.update([],memory,pose,False)
+        self.assertEqual(cache.combined_array.shape,(0,2))
+
 
 if __name__ == '__main__':
     unittest.main()

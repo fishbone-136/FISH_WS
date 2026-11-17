@@ -153,11 +153,27 @@ from the localization bridge. This stream is published only after the same
 freshness, jump and startup checks that admit navigation odometry. Memory does
 not wait for the equivalent dynamic TF to traverse a second callback queue.
 Custom `full_pose_topic` inputs retain the independent timestamped TF check.
+The bridge keeps only the newest queued odometry. A timestamp-only delay still
+closes the physical motion gate at the original 0.30-second age limit, without
+cancelling the goal or clearing maps during the bounded input-timeout interval.
+A new pose passing all geometry/jump checks can release that temporary hold
+immediately. Persistent input loss, future timestamps and genuine localization
+faults retain the cancellation/clear behavior. Rejected poses are never forwarded
+or restamped.
+The FAST-LIO synchronizer likewise discards an expired LiDAR frame before
+consuming IMU. If a frame expires between synchronization and validation, its
+unprocessed IMU prefix is returned ahead of newer samples. A scheduling spike
+therefore cannot permanently stop localization just because one otherwise
+valid frame crossed the 300 ms age limit. Future/invalid timestamps, IMU gaps,
+non-finite measurements and estimator/matching failures retain their guards.
 Latest-frame subscriptions and arrival-triggered processing avoid stale
-observation queues. New occupied evidence publishes immediately; the 15 Hz
+observation queues. New occupied evidence publishes before motion classification;
+tracking receives the original pre-hit memory snapshot. The 15 Hz
 timer repeats its actual acquisition timestamp, and background clearing runs
 separately from occupied writes. The final scan/memory gate also consumes only
 the newest queued sensor message and transforms remembered points in a batch.
+It reuses numeric obstacle arrays between source updates and skips predicted
+motion arcs for zero commands while still checking freshness and publishing stop.
 Artificial scan gap-fill/spread
 points are never persisted. Each occupied cell retains measured world-height
 bounds from its first observation; roll, pitch and height are included before
@@ -203,10 +219,30 @@ two-dimensional model keeps its consecutive-frame semantics.
 
 The clearing worker receives only in-range cells not occupied within the last
 0.5 seconds. Other cells stay in the main memory. Completion is checked every
-40 ms, with dispatch limited to 6 Hz and a single outstanding job. The
-0.6-second result freshness limit and newer-hit merge protection remain active.
+40 ms, with dispatch limited to 6 Hz and a single outstanding job. Sensor gaps
+are measured between accepted observations, independently of worker scheduling.
+An actual gap longer than 0.6 seconds also invalidates an older in-flight result.
+Worker results allow up to 1.5 seconds of computation/dispatch latency, controlled
+by `clearing_result_max_age` (strictly below the confirmation window), while
+newer-hit merge protection remains active. Confirmed removals immediately publish
+the protective cloud and navigation grids so Nav2 rebuilds their inflation halos.
+Clearing can select a paired observation up to 0.75 seconds old, inside that
+result limit; the raw-cloud cache retains sixteen frames for pairing. Continuity
+is measured on the validated-pose stream instead of the slower processed-scan
+subset. Motion freshness limits and the four-second evidence window are unchanged.
+Short-lived groups of sparse returns can clear with eight repeated, measured
+floor observations beyond their old positions, provided no occupied support or
+occluder remains. Groups use actual distances rather than quantized bin adjacency;
+isolated sparse landmarks and established static cells retain their normal guard.
+A `positive_only` observation disables floor/column inference, but a timestamp-
+paired raw cloud can still prove a 3-D beam segment through an old volume free.
+The raw subscriber keeps eight queued frames for pairing; absent raw data never
+supplies clearing evidence. No time-only expiry is used.
 `/safety/obstacle_memory_status` reports `clearing_policy`, candidate counts,
-completed jobs and removed cells for checking which implementation is running.
+completed jobs, removed cells, `last_clearing_result_age` and
+`clearing_observation_resets` for checking progress. The isolated ROS check
+`check_obstacle_memory_ros.py --refresh-only` verifies that a removed box and
+its complete inflation halo return to baseline while a stationary leg survives.
 Motion diagnostics include `dynamic_tracks_confirmed` and
 `dynamic_history_cells`. `/safety/save_obstacle_memory` exports a checkpoint of
 occupied geometry and dynamic cell tags; `restore_state_file` accepts it only

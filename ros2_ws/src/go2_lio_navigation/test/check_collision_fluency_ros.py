@@ -28,7 +28,7 @@ from check_obstacle_pipeline import Fixture
 
 def main():
     rclpy.init()
-    f = Fixture()
+    f = Fixture(publish_maps='--continuity-only' not in sys.argv)
     children = []
     samples = {'input': [], 'monitor': [], 'gate': [], 'diagnostics': []}
     f.scan_override = []
@@ -82,6 +82,9 @@ def main():
         f.lifecycle(Transition.TRANSITION_CONFIGURE)
         f.lifecycle(Transition.TRANSITION_ACTIVATE)
         results = {str(lag): continuity(lag) for lag in (.2, 1.)}
+        if '--continuity-only' in sys.argv:
+            print(json.dumps({'results': results}), flush=True)
+            return
         f.scan_override = [(f.padded_length-.02, 0.)]
         began = time.monotonic()
         f.until(lambda: f.safe.linear.x == 0., timeout=.25)

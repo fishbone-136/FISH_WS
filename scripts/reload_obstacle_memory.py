@@ -25,6 +25,19 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--main-pid',type=int,required=True)
     parser.add_argument('--memory-pid',type=int,required=True)
+    parser.add_argument('--gate-pid',type=int,
+                        help='Also reload this identified idle scan safety gate')
+    parser.add_argument('--bridge-pid',type=int,
+                        help='Also reload this identified LIO-to-base bridge; keep FAST-LIO running')
+    parser.add_argument('--previous-supervisor-pid',type=int,
+                        help='Retire the supervisor owning all three identified replacement children')
+    parser.add_argument('--recover-report',type=Path,
+                        help='Resume stopped children from this same-session failed reload report')
+    parser.add_argument('--memory-params-file',type=Path)
+    parser.add_argument('--gate-params-file',type=Path)
+    parser.add_argument('--bridge-params-file',type=Path)
+    parser.add_argument('--keep-on-health-timeout',action='store_true',
+                        help='Keep live fail-closed children for diagnosis if readiness is delayed')
     parser.add_argument('--report-prefix',default='memory_reload_'+time.strftime('%Y%m%d_%H%M%S'))
     parser.add_argument('--check-only',action='store_true')
     parser.add_argument('--reset-session-memory',action='store_true')
@@ -68,10 +81,44 @@ def main():
         return argv
 
     identity(args.main_pid,'go2_lio_navigation.launch.py')
-    argv=identity(args.memory_pid,'obstacle_memory.py')
+    recovery=None
+    if args.recover_report:
+        recovery=json.loads(args.recover_report.read_text())
+        expected={'owner_pid':args.main_pid,'memory_pid':args.memory_pid,
+                  'gate_pid':args.gate_pid,'bridge_pid':args.bridge_pid,'children_stopped':True}
+        if any(recovery.get(k)!=v for k,v in expected.items()):
+            raise RuntimeError('Recovery report does not identify this stopped session')
+        if not args.preserve_session_memory or args.reset_session_memory or regional_clear:
+            raise RuntimeError('Recovery requires an unchanged preserved checkpoint')
+        for pid in (args.memory_pid,args.gate_pid,args.bridge_pid):
+            if pid is None or process_identity(pid) is not None:
+                raise RuntimeError('Recovery refuses live or unidentified original children')
+        def recovered_command(executable,params,python=False):
+            if params is None or not params.is_file():raise RuntimeError('Missing original parameters')
+            path=ROOT/'ros2_ws/install/go2_lio_navigation/lib/go2_lio_navigation'/executable
+            return (['/usr/bin/python3',str(path)] if python else [str(path)])+[
+                '--ros-args','--params-file',str(params.resolve())]
+        argv=recovered_command('obstacle_memory.py',args.memory_params_file,True)
+        gate_argv=recovered_command('scan_safety_gate.py',args.gate_params_file,True)
+        bridge_argv=recovered_command('lio_base_bridge',args.bridge_params_file)
+    else:
+        argv=identity(args.memory_pid,'obstacle_memory.py')
+        gate_argv=identity(args.gate_pid,'scan_safety_gate.py') if args.gate_pid else None
+        bridge_argv=identity(args.bridge_pid,'lio_base_bridge') if args.bridge_pid else None
+    gate_token=process_identity(args.gate_pid) if args.gate_pid else None
+    bridge_token=process_identity(args.bridge_pid) if args.bridge_pid else None
     old_token=process_identity(args.memory_pid)
-    if old_token is None:raise RuntimeError('Original memory process already exited')
+    if old_token is None and recovery is None:raise RuntimeError('Original memory process already exited')
     managed=ManagedChildren(args.main_pid)
+    previous_token=None
+    if args.previous_supervisor_pid is not None:
+        identity(args.previous_supervisor_pid,'reload_obstacle_memory.py')
+        previous_token=process_identity(args.previous_supervisor_pid)
+        for pid in (args.memory_pid,args.gate_pid,args.bridge_pid):
+            if pid is None:raise RuntimeError('Supervisor retirement requires all three child PIDs')
+            fields=Path(f'/proc/{pid}/stat').read_text().rsplit(')',1)[1].split()
+            if int(fields[1])!=args.previous_supervisor_pid:
+                raise RuntimeError('Previous supervisor does not own the identified child')
     from action_msgs.msg import GoalStatusArray
     from geometry_msgs.msg import Twist
     from nav_msgs.msg import Odometry
@@ -116,8 +163,11 @@ def main():
             rclpy.spin_once(node,timeout_sec=.02)
     def idle():
         recent=[v for v in velocities if time.monotonic()-v[0]<.75]
-        if (any(v in (1,2,3) for v in state['statuses']) or len(recent)<10 or
-                any(abs(v)>.001 for row in recent for v in row[1:]) or
+        recovery_stopped=(recovery is not None and not recent and
+                          node.count_publishers('/cmd_vel_guarded')==0)
+        if (any(v in (1,2,3) for v in state['statuses']) or
+                (not recovery_stopped and (len(recent)<10 or
+                 any(abs(v)>.001 for row in recent for v in row[1:]))) or
                 time.monotonic()-state.get('sport_time',-math.inf)>.5 or not state.get('stationary')):
             raise RuntimeError('Active goal, motion or stale feedback; reload refused')
     def call(kind,topic,request):
@@ -143,12 +193,21 @@ def main():
         if args.check_only:
             print(json.dumps(report,indent=2))
             return
-        saved=call(Trigger,'/mapping/save',Trigger.Request())
+        saved=(Trigger.Response(success=True,message=recovery['saved_map'])
+               if recovery is not None else call(Trigger,'/mapping/save',Trigger.Request()))
         if not saved.success:raise RuntimeError('Reference map save failed: '+saved.message)
         report['saved_map']=saved.message
         if '--ros-args' not in argv:argv.append('--ros-args')
         if args.preserve_session_memory:
-            checkpoint=call(Trigger,'/safety/save_obstacle_memory',Trigger.Request())
+            deadline=time.monotonic()+8.
+            while True:
+                checkpoint=(Trigger.Response(success=True,message=recovery['checkpoint'])
+                    if recovery is not None else
+                    call(Trigger,'/safety/save_obstacle_memory',Trigger.Request()))
+                if checkpoint.success or time.monotonic()>=deadline:break
+                if checkpoint.message!='Memory is not healthy for a checkpoint':break
+                spin(.3)
+                idle()
             if not checkpoint.success:raise RuntimeError('Memory checkpoint failed: '+checkpoint.message)
             report['checkpoint']=checkpoint.message
             restore_file=checkpoint.message
@@ -192,13 +251,55 @@ def main():
         # freshness bound. Drain queued feedback before the final idle check.
         spin(.3)
         idle()
-        identity(args.memory_pid,'obstacle_memory.py')
+        if previous_token is not None:
+            identity(args.previous_supervisor_pid,'reload_obstacle_memory.py')
+            if process_identity(args.previous_supervisor_pid)!=previous_token:
+                raise RuntimeError('Previous supervisor identity changed')
+            os.kill(args.previous_supervisor_pid,signal.SIGINT)
+            end=time.monotonic()+18.
+            while process_identity(args.previous_supervisor_pid)==previous_token and time.monotonic()<end:spin(.05)
+            for pid in (args.previous_supervisor_pid,args.memory_pid,args.gate_pid,args.bridge_pid):
+                if process_identity(pid) is not None:
+                    raise RuntimeError('Previous supervisor/child did not stop; refuse duplicate')
+            old_token=gate_token=bridge_token=None
+            report['retired_supervisor_pid']=args.previous_supervisor_pid
+        if old_token is not None:identity(args.memory_pid,'obstacle_memory.py')
         if process_identity(args.memory_pid)!=old_token:raise RuntimeError('Original memory PID changed')
-        os.kill(args.memory_pid,signal.SIGINT)
+        if old_token is not None:os.kill(args.memory_pid,signal.SIGINT)
         end=time.monotonic()+8.
-        while process_identity(args.memory_pid)==old_token and time.monotonic()<end:spin(.05)
-        if process_identity(args.memory_pid)==old_token:
+        while old_token is not None and process_identity(args.memory_pid)==old_token and time.monotonic()<end:spin(.05)
+        if old_token is not None and process_identity(args.memory_pid)==old_token:
             raise RuntimeError('Original node did not stop; refuse duplicate replacement')
+        if bridge_argv is not None:
+            if bridge_token is not None:identity(args.bridge_pid,'lio_base_bridge')
+            if process_identity(args.bridge_pid)!=bridge_token:
+                raise RuntimeError('Original LIO bridge PID changed')
+            if bridge_token is not None:os.kill(args.bridge_pid,signal.SIGINT)
+            end=time.monotonic()+8.
+            while bridge_token is not None and process_identity(args.bridge_pid)==bridge_token and time.monotonic()<end:spin(.05)
+            if bridge_token is not None and process_identity(args.bridge_pid)==bridge_token:
+                raise RuntimeError('Original LIO bridge did not stop; refuse duplicate replacement')
+            with (ROOT/'reports'/f'{args.report_prefix}_bridge.log').open('x') as bridge_log:
+                bridge=managed.start(bridge_argv,cwd=ROOT,env=os.environ.copy(),
+                    stdout=bridge_log,stderr=subprocess.STDOUT)
+            report['bridge_pid']=bridge.pid
+        if gate_argv is not None:
+            if gate_token is not None:identity(args.gate_pid,'scan_safety_gate.py')
+            if process_identity(args.gate_pid)!=gate_token:
+                raise RuntimeError('Original safety gate PID changed')
+            if gate_token is not None:os.kill(args.gate_pid,signal.SIGINT)
+            end=time.monotonic()+8.
+            while gate_token is not None and process_identity(args.gate_pid)==gate_token and time.monotonic()<end:spin(.05)
+            if gate_token is not None and process_identity(args.gate_pid)==gate_token:
+                raise RuntimeError('Original safety gate did not stop; refuse duplicate replacement')
+            gate_argv[0]='/usr/bin/python3'
+            gate_log=(ROOT/'reports'/f'{args.report_prefix}_gate.log').open('x')
+            # ManagedChildren retains the process; Popen duplicates this FD.
+            try:
+                gate=managed.start(gate_argv,cwd=ROOT,env=os.environ.copy(),
+                    stdout=gate_log,stderr=subprocess.STDOUT)
+            finally:gate_log.close()
+            report['gate_pid']=gate.pid
         state.pop('memory',None)
         argv[0]='/usr/bin/python3'
         log=(ROOT/'reports'/f'{args.report_prefix}_memory.log').open('x')
@@ -212,6 +313,10 @@ def main():
         while time.monotonic()<deadline:
             spin(.05)
             if child.poll() is not None:raise RuntimeError('Replacement memory node exited')
+            if gate_argv is not None and gate.poll() is not None:
+                raise RuntimeError('Replacement safety gate exited')
+            if bridge_argv is not None and bridge.poll() is not None:
+                raise RuntimeError('Replacement LIO bridge exited')
             m=state.get('memory',{})
             report['replacement_last_status']=m
             healthy=(m.get('clearing_policy')=='motion_evidence_v7_near_volume' and
@@ -219,10 +324,11 @@ def main():
                 (not args.preserve_session_memory or m.get('checkpoint_restored')) and
                 (not args.reset_session_memory or not m.get('checkpoint_restored')) and
                 m.get('accepted_scans',0)>=15 and m.get('localized') and
-                m.get('scan_age',math.inf)<.60 and m.get('fault') is None)
+                m.get('fault') is None)
             # Diagnostics are sampled at 5 Hz, between 15 Hz observations.
             # Requiring *every diagnostic* below the final freshness bound
             # rejects a healthy updating node just for its sample phase.
+            # Intermediate sample ages must not restart this progress window.
             # Demand continued scan progress and a fresh final observation;
             # the robot's motion gate retains its stricter independent check.
             if healthy:
@@ -234,11 +340,15 @@ def main():
             else:
                 healthy_since=None
                 first_accepted=None
-        else:raise RuntimeError('Updated memory did not become continuously healthy')
+        else:
+            if not args.keep_on_health_timeout:
+                raise RuntimeError('Updated memory did not become continuously healthy')
+            report['health_verification_pending']=True
         idle()
-        for topic in ('/local_costmap/clear_entirely_local_costmap',
-                      '/global_costmap/clear_entirely_global_costmap'):
-            call(ClearEntireCostmap,topic,ClearEntireCostmap.Request())
+        if not report.get('health_verification_pending'):
+            for topic in ('/local_costmap/clear_entirely_local_costmap',
+                          '/global_costmap/clear_entirely_global_costmap'):
+                call(ClearEntireCostmap,topic,ClearEntireCostmap.Request())
         report['applied']=True
         report['after']=dict(state)
         write()
@@ -246,6 +356,10 @@ def main():
         while managed.owner_alive():
             spin(.2)
             if child.poll() is not None:raise RuntimeError('Replacement memory node exited')
+            if gate_argv is not None and gate.poll() is not None:
+                raise RuntimeError('Replacement safety gate exited')
+            if bridge_argv is not None and bridge.poll() is not None:
+                raise RuntimeError('Replacement LIO bridge exited')
     except KeyboardInterrupt:
         report['shutdown']='Supervisor interrupted'
     except Exception as exc:

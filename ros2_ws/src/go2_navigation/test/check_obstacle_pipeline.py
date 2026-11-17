@@ -32,8 +32,9 @@ from environment_mapper import cloud_message  # noqa: E402
 
 
 class Fixture(Node):
-    def __init__(self):
+    def __init__(self,publish_maps=True):
         super().__init__('obstacle_pipeline_fixture')
+        self.publish_maps=publish_maps
         self.box_x = None
         self.box_width = 0.44
         self.box_heights = None
@@ -215,6 +216,7 @@ class Fixture(Node):
                 (-self.padded_length, self.padded_width))]
             self.footprint.publish(shape)
         for pub, frame, size in [(self.local, 'odom_lio', 100), (self.global_map, 'map', 200)]:
+            if not self.publish_maps:break
             grid = OccupancyGrid()
             grid.header.stamp, grid.header.frame_id = stamp, frame
             grid.info.resolution, grid.info.width, grid.info.height = 0.1, size, size

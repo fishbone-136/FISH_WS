@@ -160,9 +160,6 @@ class SpeechController:
         if self._stop.is_set():
             self._emit_state("idle")
             return
-        # Warm Qwen independently while ASR loads. Listening does not wait for
-        # Qwen, Kokoro, or discovery of the robot's motion service.
-        self._start_background_warmup()
         try:
             self._emit_state("thinking")
             self._asr.start()
@@ -176,6 +173,10 @@ class SpeechController:
         if self._stop.is_set() or not self._running:
             self._emit_state("idle")
             return
+
+        # ASR 已完成 GPU 分配，再后台等待 TTS 并预热 Qwen。麦克风采集不等待
+        # 模型预热，也不等待机器人运动服务发现。
+        self._start_background_warmup()
 
         # UACDemoV1.0 在 PulseAudio 下反复打开/关闭输入流后可能继续显示 RUNNING，
         # 但只返回全零 PCM。整个语音会话只打开一次麦克风并持续复用同一条流。
@@ -235,12 +236,36 @@ class SpeechController:
                         bool(text), float(self._asr.last_result.get("no_speech_prob", 0.0)),
                         self._asr.last_result.get("rejection_reason", ""),
                     )
+                    if self._asr.last_result.get("rescue_attempted"):
+                        logging.info(
+                            "ASR 高精度复核%s（%s）：主模型=%s，复核模型=%s，决策=%s，"
+                            "主模型置信度=%s，复核置信度=%s，复核静音概率=%s，"
+                            "锁定语言=%s，专名提示=%s，拒绝原因=%s",
+                            "已采用" if self._asr.last_result.get("rescue_applied") else "未替换",
+                            self._asr.last_result.get("rescue_reason", "低置信度"),
+                            self._asr.last_result.get("primary_text", ""),
+                            self._asr.last_result.get("rescue_text", ""),
+                            self._asr.last_result.get("rescue_decision", ""),
+                            self._asr.last_result.get("primary_avg_logprob"),
+                            self._asr.last_result.get("rescue_avg_logprob"),
+                            self._asr.last_result.get("rescue_no_speech_prob"),
+                            self._asr.last_result.get("rescue_language"),
+                            self._asr.last_result.get("rescue_hint", ""),
+                            self._asr.last_result.get("rescue_rejection_reason", ""),
+                        )
                     if not text:
                         self._adjust_rejected_noise(audio)
                         self._emit_state("listening")
                         rejection_reason = self._asr.last_result.get("rejection_reason")
-                        if rejection_reason == "command_disagreement":
-                            message = "两次识别的动作或距离不一致，未执行。请重新说出完整指令。"
+                        if rejection_reason == "command_disagreement" or (
+                            rejection_reason or ""
+                        ).startswith("rescue_"):
+                            if rejection_reason == "command_disagreement":
+                                message = "两次识别的动作或距离不一致，未执行。请重新说出完整指令。"
+                            elif rejection_reason == "rescue_unresolved_vocabulary":
+                                message = "地点名称没有识别清楚，请再说一次完整名称。"
+                            else:
+                                message = "两次识别未能确认这句话，请再说一次。"
                             self._emit_status(message)
                             if self.on_response:
                                 self.on_response(message)
@@ -254,15 +279,6 @@ class SpeechController:
                             logging.info("已忽略静音或低置信度音频")
                         continue
                     self._emit_status(f"语音识别完成（{asr_seconds:.1f}秒）")
-                    if self._asr.last_result.get("rescue_attempted"):
-                        logging.info(
-                            "ASR 高精度复核%s（%s）：主模型=%s，复核模型=%s，决策=%s",
-                            "已采用" if self._asr.last_result.get("rescue_applied") else "未替换",
-                            self._asr.last_result.get("rescue_reason", "低置信度"),
-                            self._asr.last_result.get("primary_text", ""),
-                            self._asr.last_result.get("rescue_text", ""),
-                            self._asr.last_result.get("rescue_decision", ""),
-                        )
                     if self._asr.last_result.get("hallucination_stripped"):
                         logging.info(
                             "已移除 Whisper 字幕幻觉尾巴: %s",
@@ -314,13 +330,21 @@ class SpeechController:
     def _warm_up_llm(self) -> None:
         # A separate client keeps warmup and foreground conversation state apart.
         try:
-            if self._stop.is_set():
+            if not self._wait_for_warmup_dependencies() or self._stop.is_set():
                 return
             timing = OllamaClient().warm_up()
-            logging.info("Qwen 后台预热完成: %.3fs", timing.get("wall_seconds", 0.0))
+            logging.info(
+                "Qwen 后台预热完成: %.3fs（模型加载 %.3fs，上下文 %s，保活 %s）",
+                timing.get("wall_seconds", 0.0), timing.get("load_seconds", 0.0),
+                config.OLLAMA_CONTEXT_LENGTH, config.OLLAMA_KEEP_ALIVE,
+            )
         except (OllamaError, ValueError) as exc:
             if self._running:
                 self._emit_error(f"Qwen 后台预热未完成，首轮对话可能较慢：{exc}")
+
+    def _wait_for_warmup_dependencies(self) -> bool:
+        """离线控制器没有 TTS 依赖；实机控制器在后台等待其 GPU 初始化。"""
+        return not self._stop.is_set()
 
     def _adjust_rejected_noise(self, audio) -> None:
         # Only learn from a long, steady recording ASR classified as silence.

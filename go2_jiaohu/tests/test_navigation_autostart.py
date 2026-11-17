@@ -53,6 +53,7 @@ def navigation(dashboard, monkeypatch):
     monkeypatch.setattr(page_module.RvizView, 'start', lambda self: None)
     monkeypatch.setattr(page_module.RvizView, 'shutdown', lambda self: None)
     existing = []
+    monkeypatch.setattr(runtime_guard, 'navigation_network_error', lambda: '')
     monkeypatch.setattr(runtime_guard, 'conflicting_navigation_processes', lambda **kw: existing)
     window.switch_page(1)
     page = window.navigation_page

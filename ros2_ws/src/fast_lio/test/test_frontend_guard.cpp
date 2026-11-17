@@ -1,5 +1,6 @@
 #include <limits>
 #include <vector>
+#include <deque>
 #include "gtest/gtest.h"
 #include "frontend_guard.hpp"
 
@@ -22,6 +23,24 @@ const char * check(const std::vector<fast_lio_guard::ImuSample> & samples, doubl
 TEST(InputGuard, AcceptsFreshContinuousDeviceTime)
 {
   EXPECT_EQ(check(healthy()), nullptr);
+}
+
+TEST(ScanBacklog, DropsLateFramesWithoutReclassifyingFutureOrCorruptTime)
+{
+  using fast_lio_guard::stale_scan;
+  EXPECT_TRUE(stale_scan(10.,10.066,10.379,.30,.15));
+  EXPECT_FALSE(stale_scan(10.,10.066,10.20,.30,.15));
+  EXPECT_FALSE(stale_scan(10.,10.066,9.8,.30,.15));
+  EXPECT_FALSE(stale_scan(10.,11.,12.,.30,.15));
+  EXPECT_FALSE(stale_scan(10.,std::numeric_limits<double>::quiet_NaN(),12.,.30,.15));
+}
+
+TEST(ScanBacklog, RejectedFrameRestoresAllImuAheadOfNewArrivals)
+{
+  std::deque<int> buffered{4,5};std::vector<int> rejected{1,2,3};
+  fast_lio_guard::restore_unprocessed_imu(buffered,rejected);
+  EXPECT_EQ(buffered,(std::deque<int>{1,2,3,4,5}));
+  EXPECT_TRUE(rejected.empty());
 }
 
 TEST(ScanTiming, TimedHapShortFrameDoesNotConsumeNextFramesImu)

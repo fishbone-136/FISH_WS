@@ -99,6 +99,67 @@ class MemoryFixture(Fixture):
         return count
 
 
+def obstacle_refresh(f,start):
+    """A removed box's complete inflation halo must return to baseline."""
+    no_ground='--no-ground-rays' in sys.argv
+    f.floor_z=.30 if no_ground else -.37
+    if no_ground:
+        # A real farther return can prove a 3-D segment free even when no
+        # ground plane is visible. No infinity/floor inference is available.
+        f.floor_points=np.array([[x,y] for x in np.linspace(3.,4.,6)
+                                for y in np.linspace(-1.,1.,21)])
+    f.extra_points=[[1.6,1.6,f.floor_z+h] for h in (.11,.30,.50)]
+    start(['ros2','launch','go2_navigation','go2_nav2.launch.py',
+           'mapping_mode:=true','lio_mode:=true','log_level:=error'])
+    f.until(lambda:f.memory_map is not None and f.costmap is not None,timeout=25.)
+    def region_count():
+        m=f.costmap
+        yy,xx=np.indices((m.info.height,m.info.width));o=m.info.origin.position
+        wx=o.x+(xx+.5)*m.info.resolution;wy=o.y+(yy+.5)*m.info.resolution
+        region=(wx>=.5)&(wx<=1.5)&(np.abs(wy)<=.65)
+        return int(np.count_nonzero(np.asarray(m.data).reshape(region.shape)[region]>0))
+    def leg_cost():
+        m=f.memory_map
+        ix=int((1.6-m.info.origin.position.x)/m.info.resolution)
+        iy=int((1.6-m.info.origin.position.y)/m.info.resolution)
+        return m.data[iy*m.info.width+ix]
+    f.until(lambda:leg_cost()==100)
+    f.wait(1.)
+    baseline=region_count()
+    sparse='--sparse-fragments' in sys.argv
+    if sparse:
+        # Five upper-body returns never form compact(): the original ghost
+        # was retained forever despite repeatedly seeing the floor behind it.
+        f.extra_points += [[1.,y,f.floor_z+.65] for y in (-.2,-.1,0.,.1,.2)]
+        f.until(lambda:f.box_cost()==100 and region_count()>baseline,timeout=10.)
+    else:
+        f.box_x=1.;f.box_width=.40
+        f.box_heights=[-.20] if no_ground else [.11+i*.025 for i in range(24)]+[.70]
+        f.until(lambda:f.box_cost()==100 and region_count()>baseline,timeout=10.)
+        f.wait(1.)
+    occupied=region_count()
+    f.box_x=None
+    if sparse:f.extra_points=[[1.6,1.6,f.floor_z+h] for h in (.11,.30,.50)]
+    removed=time.monotonic()
+    try:
+        f.until(lambda:f.old_box_cells()==0 and region_count()==baseline,timeout=12.)
+    except AssertionError:
+        print('REFRESH DEBUG',json.dumps({'memory':f.memory_status,
+            'remaining_box_cells':f.old_box_cells(),'cost_cells':region_count(),
+            'baseline':baseline}),flush=True)
+        raise
+    elapsed=time.monotonic()-removed
+    assert leg_cost()==100,'Stationary leg must survive removal of the box'
+    print('PASS removed box and entire inflation halo return to baseline in %.3f s; static leg retained'%elapsed,flush=True)
+    root=Path(os.environ.get('GO2_HUMBLE_PROJECT_ROOT',Path(__file__).resolve().parents[4]))
+    name='pedestrian_fragment_refresh_measurement.json' if sparse else 'obstacle_refresh_measurement.json'
+    if no_ground:name='no_ground_volume_refresh_measurement.json'
+    (root/'reports'/name).write_text(json.dumps({
+        'baseline_cost_cells':baseline,'occupied_cost_cells':occupied,
+        'final_cost_cells':region_count(),'inflation_clear_seconds':elapsed,
+        'static_leg_retained':True},indent=2))
+
+
 def dynamic_crossing(f,start,executable,memory):
     """Upper-body returns + floor-only background reproduce the real ghost."""
     f.floor_z=-.37;f.box_x=None;f.box_width=.36
@@ -197,6 +258,9 @@ def main():
         else:
             memory=start(['/usr/bin/python3',str(executable/'obstacle_memory.py'),
                           '--ros-args','-p','raw_cloud_topic:=/test/cloud_fast','-p','full_pose_topic:=/odom'])
+        if '--refresh-only' in sys.argv:
+            obstacle_refresh(f,start)
+            return
         start(['/usr/bin/python3',str(executable/'scan_safety_gate.py')])
         if '--dynamic-crossing' in sys.argv or '--mixed-crossing' in sys.argv:
             dynamic_crossing(f,start,executable,memory)

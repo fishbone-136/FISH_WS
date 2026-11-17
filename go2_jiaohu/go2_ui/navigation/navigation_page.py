@@ -494,6 +494,18 @@ class NavigationPage(QWidget):
         if self._navigation_state == 'fault':
             self._append_log('定位保护已触发，请先重启导航进程；恢复按钮不能解除定位故障。')
             return
+        try:
+            from go2_navigation.runtime_guard import navigation_network_error
+            network_error = navigation_network_error()
+        except ImportError as error:
+            network_error = f'导航环境检查失败: {error}；请使用 scripts/run_ui.sh 启动'
+        if network_error:
+            self._autostart_timer.stop()
+            self._autostart_attempted = True
+            self._startup_failed(network_error)
+            if not background:
+                self.rviz_view._show_error(network_error)
+            return
         self._autostart_timer.stop()
         self._autostart_attempted = True
         self._startup_error = ''

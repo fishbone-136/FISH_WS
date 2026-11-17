@@ -108,7 +108,7 @@ def navigation_grid(data,width,height,source_resolution,target_resolution):
 
 def clearing_delta(geometry,rays,pose,stamp,previous_stamp,clear_window=4.,
                    max_gap=.60,clear_frames=8,clear_seconds=.5,radius=20.,ground_plane=None,
-                   dynamic_flags=None):
+                   dynamic_flags=None,transient_flags=None):
     """Vectorized 3-D counter updates; return only changed rows, never geometry.
 
     Layout is the same seven columns stored in ObstacleMemory.cells. NaN
@@ -145,6 +145,15 @@ def clearing_delta(geometry,rays,pose,stamp,previous_stamp,clear_window=4.,
             if len(selected):
                 seen=rays.sees_beyond(geometry[selected,:2],ground_plane)
                 free[selected]|=seen&~support[selected]
+        if transient_flags is not None and rays.ground_supported(ground_plane):
+            # Sparse pedestrian fragments may never form a compact track.
+            # Short-lived groups still need eight real floor observations
+            # beyond the old cells, no occupied support, and no occluder.
+            # Established landmarks retain the ordinary 3-D volume test.
+            transient=np.asarray(transient_flags,dtype=bool).reshape(len(geometry))
+            selected=np.flatnonzero(transient&~dynamic&~support)
+            if len(selected):
+                free[selected]|=rays.sees_beyond(geometry[selected,:2],ground_plane,ground_only=True)
     since=geometry[:,3].copy();count=geometry[:,4].copy()
     reset=np.isfinite(since)&(stamp-since>clear_window)
     if stamp-previous_stamp>max_gap:reset[:]=True
@@ -259,7 +268,7 @@ class RayEvidence:
     def clears_many(self,xy,low,high):
         return self.classify_many(xy,low,high)[0]
 
-    def sees_beyond(self,xy,ground_plane=None):
+    def sees_beyond(self,xy,ground_plane=None,ground_only=False):
         """Measured column visibility for already floor-consistent volumes."""
         xy=np.asarray(xy,dtype=float).reshape(-1,2)
         delta=xy-self.origin[:2];distance=np.linalg.norm(delta,axis=1)
@@ -274,12 +283,16 @@ class RayEvidence:
         offsets=np.arange(int(counts.sum()))-np.repeat(np.cumsum(counts)-counts,counts)
         points=self.sorted_indices[np.repeat(start,counts)+offsets]
         projected=distance[cells]*np.cos(self.angles[points]-np.repeat(angles,counts))
-        result[cells[self.distance[points]>projected+.20]]=True
+        beyond=self.distance[points]>projected+.20
         closer=self.distance[points]<=projected+.05
         if ground_plane is not None:
             # Floor endpoints do not occlude a tracked moving body's column.
             height=self.points[points]@np.asarray(ground_plane[:3])+ground_plane[3]
             closer&=height>.08
+            if ground_only:beyond&=np.abs(height)<=.03
+        elif ground_only:
+            return result
+        result[cells[beyond]]=True
         blocked[cells[closer]]=True
         return result&~blocked
 

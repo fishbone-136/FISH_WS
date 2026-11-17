@@ -276,13 +276,19 @@ class ScanSafetyGate(Node):
         requested = (candidate.linear.x, candidate.linear.y, candidate.angular.z)
         half_length = self.footprint_half_length+self.turn_margin
         half_width = self.footprint_half_width+self.turn_margin
-        remembered, obstacles = self.geometry_cache.update(
+        self.geometry_cache.update(
             self.obstacle_points, self.memory_xy, self.ego_pose,
             self.memory_supported and self.memory_frame == self.ego_frame)
-        caution = close_clearance_scale(obstacles, *requested, half_length, half_width)
+        remembered = self.geometry_cache.remembered_array
+        obstacles = self.geometry_cache.combined_array
+        moving = any(abs(v) > 1.e-6 for v in requested)
+        # A zero command needs freshness checks and immediate publication,
+        # but no predicted walking/turning arc. Avoid starving scan callbacks
+        # with repeated conversions of thousands of remembered points at rest.
+        caution = close_clearance_scale(obstacles, *requested, half_length, half_width) if moving else 1.
         requested = tuple(caution*x for x in requested)
         braking = braking_speed_scale(
-            obstacles, *requested, half_length, half_width, max(0., age))
+            obstacles, *requested, half_length, half_width, max(0., age)) if moving else 1.
         turn_clear = braking > 0.
         if turn_clear != self.last_turn_clear:
             self.turn_status.publish(Bool(data=turn_clear))
@@ -295,7 +301,7 @@ class ScanSafetyGate(Node):
         ratio = min(braking, self.approach.scale(
             requested[0], current, requested[1], requested[2], half_width)) if permitted else 0.
         memory_scale = 1.
-        if remembered and math.hypot(requested[0],requested[1])>1.e-6:
+        if len(remembered) and math.hypot(requested[0],requested[1])>1.e-6:
             memory_pose_age=max(0.,age,current-self.ego_stamp)
             contact=arc_collision_time(remembered,*requested,half_length,half_width,
                                        memory_pose_age+.20+self.approach.horizon)

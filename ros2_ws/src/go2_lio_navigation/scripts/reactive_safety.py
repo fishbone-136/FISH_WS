@@ -18,6 +18,8 @@ class ObstacleGeometryCache:
         self.scan = self.memory = self.pose = None
         self.supported = None
         self.remembered, self.combined = [], []
+        self.remembered_array = np.empty((0, 2))
+        self.combined_array = np.empty((0, 2))
 
     def update(self, scan, memory, pose, supported):
         if (scan is self.scan and memory is self.memory and pose == self.pose and
@@ -33,6 +35,8 @@ class ObstacleGeometryCache:
             remembered = np.column_stack((c * dx + s * dy, -s * dx + c * dy)).tolist()
         self.scan, self.memory, self.pose, self.supported = scan, memory, pose, supported
         self.remembered, self.combined = remembered, scan + remembered
+        self.remembered_array = np.asarray(remembered, dtype=float).reshape(-1, 2)
+        self.combined_array = np.asarray(self.combined, dtype=float).reshape(-1, 2)
         return self.remembered, self.combined
 
 
@@ -52,7 +56,9 @@ def motion_stop_reason(scan_valid, footprint_valid, memory_valid, command_fresh,
 
 
 def stop_zone_clear(points, front=.51, rear=.51, half_width=.33):
-    return not any(-rear <= x <= front and abs(y) <= half_width for x, y in points)
+    cloud = np.asarray(points, dtype=float).reshape(-1, 2)
+    return not bool(np.any((cloud[:, 0] >= -rear) & (cloud[:, 0] <= front) &
+                          (np.abs(cloud[:, 1]) <= half_width)))
 
 
 class ClosingApproach:
@@ -228,18 +234,20 @@ class ClosingApproach:
 
 def close_clearance_scale(points, vx, vy, wz, half_length=.51, half_width=.33):
     """Keep passing a nearby obstacle slow, without declaring its side unsafe."""
+    cloud = np.asarray(points, dtype=float).reshape(-1, 2)
     if math.hypot(vx,vy)<.01 and abs(wz)>1.e-6:
         # A pure turn stays inside the padded body's circumscribed circle.
         # Use its actual clearance, rather than repeatedly throttling because
         # an object is near the front rectangle but outside the whole sweep.
         radius=math.hypot(half_length,half_width)
-        clearance=min((math.hypot(x,y)-radius for x,y in points),default=math.inf)
+        clearance=float(np.min(np.hypot(cloud[:, 0],cloud[:, 1])-radius,initial=np.inf))
         blend=max(0.,min(1.,(clearance-.10)/.22))
         limit=.65+.75*blend
         return min(1.,limit/abs(wz))
-    clearance = min((math.hypot(max(abs(x)-half_length, 0.),
-                                max(abs(y)-half_width, 0.))
-                     for x, y in points if -half_length <= x <= 1.0), default=math.inf)
+    cloud = cloud[(cloud[:, 0] >= -half_length) & (cloud[:, 0] <= 1.0)]
+    clearance = float(np.min(np.hypot(np.maximum(np.abs(cloud[:, 0])-half_length, 0.),
+                                    np.maximum(np.abs(cloud[:, 1])-half_width, 0.)),
+                             initial=np.inf))
     if clearance >= .35:
         return 1.
     # Retain full caution within 20 cm of the protected footprint; continuously

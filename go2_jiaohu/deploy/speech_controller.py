@@ -57,6 +57,24 @@ class SpeechController(_LocalSpeechController):
         self._tts.close()
         self._robot.shutdown()
 
+    def _wait_for_warmup_dependencies(self) -> bool:
+        # Kokoro 的 CUDA 初始化也会占用内存。等它加载完成后再预热 Qwen，
+        # 避免刚预热的 runner 因后续 GPU 分配被卸载。仅阻塞后台预热线程。
+        started = time.monotonic()
+        deadline = started + config.OLLAMA_WARMUP_DEPENDENCY_TIMEOUT
+        while not self._stop.is_set():
+            remaining = max(0.0, deadline - time.monotonic())
+            if self._tts.wait_until_neural_ready(min(0.1, remaining)):
+                logging.info("Qwen 预热依赖已就绪：等待 TTS %.3fs", time.monotonic() - started)
+                return not self._stop.is_set()
+            if remaining <= 0:
+                logging.warning("等待 TTS 初始化超时，继续后台预热 Qwen，首轮仍可能发生模型加载")
+                return not self._stop.is_set()
+            # 初始化失败时 wait_until_neural_ready 会立即返回，避免忙循环。
+            if self._stop.wait(min(0.1, max(0.0, deadline - time.monotonic()))):
+                return False
+        return False
+
     def _speak(self, text: str) -> None:
         self._emit_state("speaking")
         # 半双工防回声：播报期间将精确配置的 PulseAudio 输入源静音。否则 USB

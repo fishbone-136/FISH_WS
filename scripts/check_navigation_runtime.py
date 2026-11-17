@@ -53,6 +53,8 @@ def main():
     parser.add_argument('--output', type=Path)
     parser.add_argument('--include-3d', action='store_true',
                         help='Subscribe to optional 3D visualization outputs (adds serialization load)')
+    parser.add_argument('--light',action='store_true',
+                        help='Sample motion/freshness only, avoiding map and raw-cloud probe load')
     args = parser.parse_args()
     if not 3 <= args.seconds <= 120:
         parser.error('--seconds must be between 3 and 120')
@@ -127,6 +129,9 @@ def main():
     if args.include_3d:
         topics += [('/mapping/terrain_surface', PointCloud2, True),
                    ('/mapping/environment_cloud', PointCloud2, True)]
+    if args.light:
+        topics=[row for row in topics if row[1] not in (OccupancyGrid,OccupancyGridUpdate,Imu,PolygonStamped)
+                and (row[1] is not PointCloud2 or row[0]=='/safety/remembered_obstacles')]
     for topic, kind, durable in topics:
         qos = latched if durable else qos_profile_sensor_data
         if topic == '/cloud_registered_body':
@@ -230,7 +235,8 @@ def main():
             try:
                 item['diagnostic'] = json.loads(message.data)
                 first=first_diagnostics.get(topic,{})
-                keys=('accepted_scans','clearing_jobs','cleared_cells','stale_clearing_results')
+                keys=('accepted_scans','clearing_jobs','cleared_cells','stale_clearing_results',
+                      'stop_pulses','clearing_observation_resets')
                 item['counter_deltas']={k:item['diagnostic'][k]-first[k] for k in keys
                     if k in first and k in item['diagnostic']}
             except ValueError:

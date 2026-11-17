@@ -147,7 +147,9 @@ public:
       "/global_costmap/clear_entirely_global_costmap");
     tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
     odom_sub_ = create_subscription<nav_msgs::msg::Odometry>(
-      input_topic_, rclcpp::QoS(50).reliable(),
+      // Old queued poses cannot control the robot. Keep only the newest one
+      // so a scheduling pause does not replay a backlog of stale timestamps.
+      input_topic_, rclcpp::QoS(1).reliable(),
       std::bind(&LioBaseBridge::on_odometry, this, std::placeholders::_1));
     motion_execution_valid_sub_ = create_subscription<std_msgs::msg::Bool>(
       motion_execution_valid_topic_, rclcpp::QoS(1).reliable().transient_local(),
@@ -188,8 +190,17 @@ private:
     const double input_age = (now() - stamp).seconds();
     if (input_age > max_input_age_ || input_age < -0.1) {
       consecutive_good_samples_ = 0;
-      publish_valid(false);
-      cancel_navigation_goals(false, "stale or future localization timestamp");
+      if (input_age > max_input_age_ && has_been_valid_ &&
+        (now() - last_input_time_).seconds() <= input_timeout_)
+      {
+        // Close the physical motion gate immediately, but preserve the goal
+        // during a bounded scheduling pause. Never forward/restamp this pose.
+        freshness_hold_ = true;
+        publish_valid(false, true);
+      } else {
+        publish_valid(false);
+        cancel_navigation_goals(false, "stale or future localization timestamp");
+      }
       RCLCPP_WARN_THROTTLE(
         get_logger(), *get_clock(), 2000,
         "Rejected FAST-LIO timestamp age %.3f s (limit %.3f s)", input_age, max_input_age_);
@@ -296,15 +307,22 @@ private:
       }
     }
 
+    const bool quick_freshness_recovery = freshness_hold_ &&
+      last_input_time_.nanoseconds() != 0 &&
+      (now() - last_input_time_).seconds() <= input_timeout_;
     last_input_time_ = now();
     last_stamp_ = stamp;
     last_odom_to_base_ = odom_to_base;
     last_twist_ = twist;
     ++consecutive_good_samples_;
-    const int required_samples = has_been_valid_ ? recovery_samples_ : startup_samples_;
+    // Every pose/velocity/jump check above still applies. A fresh, continuous
+    // pose can release a timestamp-only hold without ten more silent frames.
+    const int required_samples = quick_freshness_recovery ? 1 :
+      (has_been_valid_ ? recovery_samples_ : startup_samples_);
     if (consecutive_good_samples_ < required_samples) {
       return;
     }
+    freshness_hold_ = false;
     publish_valid(true);
     validated_raw_pub_->publish(*input);
 
@@ -378,9 +396,12 @@ private:
       reason);
   }
 
-  void publish_valid(bool valid)
+  void publish_valid(bool valid, bool transient_timestamp_hold = false)
   {
+    const bool escalate_hold = !valid && !transient_timestamp_hold && freshness_hold_;
+    if (escalate_hold) {freshness_hold_ = false;}
     if (valid_status_published_ && valid == localization_valid_) {
+      if (escalate_hold) {stop_navigation_after_localization_loss();}
       return;
     }
     const bool became_invalid = valid_status_published_ && localization_valid_ && !valid;
@@ -392,7 +413,7 @@ private:
     std_msgs::msg::Bool message;
     message.data = valid;
     valid_pub_->publish(message);
-    if (became_invalid) {
+    if ((became_invalid && !transient_timestamp_hold) || escalate_hold) {
       stop_navigation_after_localization_loss();
     }
   }
@@ -476,6 +497,7 @@ private:
   bool localization_valid_{false};
   bool valid_status_published_{false};
   bool has_been_valid_{false};
+  bool freshness_hold_{false};
   bool fault_latched_{false};
   bool motion_execution_valid_{true};
   Eigen::Isometry3d sensor_to_base_{Eigen::Isometry3d::Identity()};

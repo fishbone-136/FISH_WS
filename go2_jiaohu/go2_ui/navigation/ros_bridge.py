@@ -134,6 +134,12 @@ class RosNavigationWorker(QThread):
             return
 
         try:
+            from go2_navigation.runtime_guard import navigation_network_error
+            network_error = navigation_network_error()
+            if network_error:
+                self.status_updated.emit('error', network_error)
+                self.log_message.emit(network_error)
+                return
             self._context = Context()
             rclpy.init(context=self._context)
             self._node = Node("fishbone_navigation_ui", context=self._context)
