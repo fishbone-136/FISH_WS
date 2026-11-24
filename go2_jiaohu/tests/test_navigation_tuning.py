@@ -1,4 +1,3 @@
-import math
 import os
 from pathlib import Path
 from xml.etree import ElementTree
@@ -20,23 +19,20 @@ def test_navigation_reacts_to_fresh_obstacles_and_ignores_goal_heading():
     local = params["local_costmap"]["local_costmap"]["ros__parameters"]
     global_map = params["global_costmap"]["global_costmap"]["ros__parameters"]
 
-    assert 0.16 <= goal["xy_goal_tolerance"] <= 0.20
-    assert goal["yaw_goal_tolerance"] > math.pi
-    assert goal["stateful"] is False
-    assert local["update_frequency"] >= 10.0
-    # This is a dropout watchdog, not a costmap sampling period.  It must allow
-    # rare >0.5 s scheduling spikes without marking the layer stale.
-    assert local["obstacle_layer"]["scan"]["expected_update_rate"] == 2.0
-    assert 0.1 <= local["obstacle_layer"]["scan"]["observation_persistence"] <= 0.3
-    assert local["width"] >= 10
-    assert local["height"] >= 10
-    assert local["denoise_layer"]["minimal_group_size"] == 1
-    assert local["inflation_layer"]["inflation_radius"] >= 0.7
-    assert global_map["update_frequency"] >= 3.0
-    assert global_map["obstacle_layer"]["scan"]["expected_update_rate"] == 2.0
-    assert 0.1 <= global_map["obstacle_layer"]["scan"]["observation_persistence"] <= 0.3
-    assert global_map["denoise_layer"]["minimal_group_size"] == 1
-    assert global_map["inflation_layer"]["inflation_radius"] >= 0.7
+    assert goal["plugin"] == "go2_navigation::StableGoalChecker"
+    assert goal["xy_goal_tolerance"] == 0.10
+    assert goal["check_yaw"] is False
+    assert local["update_frequency"] >= 20.0
+    assert global_map["update_frequency"] >= 10.0
+    safety = params["physical_safety"]["ros__parameters"]
+    assert safety["collision_model"] == "rectangle"
+    assert yaml.safe_load(safety["footprint"]) == [[.38, .175], [.38, -.175], [-.38, -.175], [-.38, .175]]
+    launch = (WORKSPACE / "ros2_ws/src/go2_navigation/launch/go2_nav2.launch.py").read_text()
+    for name, costmap in (("local_costmap", local), ("global_costmap", global_map)):
+        assert costmap["denoise_layer"]["minimal_group_size"] == 1
+        assert 0 < costmap["inflation_layer"]["inflation_radius"] <= 0.30
+        assert f"'{name}.{name}.ros__parameters.obstacle_layer.scan.observation_persistence': '0.25'" in launch
+    assert "go2_navigation::CurrentObstacleLayer" in launch
 
 
 def test_rotation_shim_and_dwb_are_stable_lightweight_and_quadruped_aware():
@@ -44,38 +40,29 @@ def test_rotation_shim_and_dwb_are_stable_lightweight_and_quadruped_aware():
     follow_path = params["controller_server"]["ros__parameters"]["FollowPath"]
     smoother = params["velocity_smoother"]["ros__parameters"]
 
-    assert follow_path["plugin"] == (
-        "nav2_rotation_shim_controller::RotationShimController"
-    )
+    assert follow_path["plugin"] == "go2_navigation::StableRotationShim"
     assert follow_path["primary_controller"] == "dwb_core::DWBLocalPlanner"
-    assert 0.85 <= follow_path["rotate_to_heading_angular_vel"] <= 0.95
+    assert follow_path["trajectory_generator_name"] == "go2_navigation::GaitTrajectoryGenerator"
     assert follow_path["angular_disengage_threshold"] < (
         follow_path["angular_dist_threshold"]
     )
     assert follow_path["closed_loop"] is False
     assert follow_path["rotate_to_goal_heading"] is False
-    assert follow_path["debug_trajectory_details"] is False
     assert follow_path["vx_samples"] * follow_path["vtheta_samples"] <= 240
     assert follow_path["vy_samples"] == 1
-    assert follow_path["min_speed_xy"] >= 0.12
-    assert follow_path["min_speed_theta"] >= 0.45
-    assert 0.45 <= follow_path["max_vel_x"] <= 0.55
-    assert 0.80 <= follow_path["max_vel_theta"] <= 0.90
-    assert 0.16 <= follow_path["xy_goal_tolerance"] <= 0.20
+    assert follow_path["min_speed_xy"] == follow_path["GaitSafety.minimum_translation"] == follow_path["gait_min_translation"]
+    assert follow_path["min_speed_theta"] == follow_path["min_rotation_angular_vel"]
+    assert follow_path["max_vel_x"] == smoother["max_velocity"][0]
+    assert follow_path["max_vel_theta"] == smoother["max_velocity"][2]
+    assert follow_path["xy_goal_tolerance"] == 0.10
     assert follow_path["GoalDist.scale"] > follow_path["PathAlign.scale"]
-    assert follow_path["Twirling.scale"] >= 5.0
-    assert "BaseObstacle" in follow_path["critics"]
+    assert follow_path["critics"][0] == "GaitSafety"
     assert "Twirling" in follow_path["critics"]
     assert "RotateToGoal" not in follow_path["critics"]
     assert smoother["scale_velocities"] is True
-    assert 20.0 <= smoother["smoothing_frequency"] <= 25.0
-    assert smoother["max_accel"][0] <= 0.7
-    assert smoother["max_accel"][2] <= 1.3
-    assert smoother["max_decel"][2] >= -1.3
-    assert smoother["deadband_velocity"][0] >= 0.12
-    assert 0.25 <= smoother["deadband_velocity"][2] <= 0.30
-    # DWB may combine a valid linear command with 0.4 rad/s yaw; an
-    # axis-wise deadband above it silently removes steering.
+    assert smoother["smoothing_frequency"] >= 50.0
+    assert smoother["feedback"] == "OPEN_LOOP"
+    assert smoother["deadband_velocity"][0] < follow_path["gait_min_translation"]
     assert smoother["deadband_velocity"][2] < follow_path["min_speed_theta"]
 
 
@@ -94,28 +81,30 @@ def test_slam_keeps_precision_while_publishing_maps_at_four_hz():
     assert slam["occupancy_threshold"] >= 0.2
 
 
-def test_global_path_is_replaced_only_when_the_goal_changes():
+def test_global_path_replans_to_the_latest_goal_without_clearing_obstacles():
     tree = ElementTree.parse(
         WORKSPACE
         / "ros2_ws/src/go2_navigation/config/navigate_w_replanning_and_recovery.xml"
     )
-    # Replacing a path interrupts the local controller and is visible on a
-    # quadruped as a gait pause. Dynamic obstacles stay in the 10 Hz local loop.
-    assert tree.findall(".//GoalUpdatedController")
-    assert not tree.findall(".//RateController")
-    assert not tree.findall(".//IsPathValid")
-    assert not tree.findall(".//SmoothPath")
-    assert len(tree.findall(".//ComputePathToPose")) == 1
+    planner = tree.find(".//RateController")
+    assert float(planner.attrib["hz"]) == 2.0
+    latest = planner.find(".//LatestGoalPose")
+    compute = planner.find(".//ComputePathToPose")
+    assert latest.attrib["output"] == compute.attrib["goal"]
+    recovery = tree.find(".//ReactiveFallback")
+    assert [node.tag for node in recovery] == ["GoalUpdated", "Wait"]
 
 
-def test_navfn_accepts_a_nearby_safe_goal_when_live_map_marks_the_exact_cell():
+def test_navigation_requires_the_exact_goal_and_lio_uses_its_exact_goal_plugin():
     params = _yaml("ros2_ws/src/go2_navigation/config/nav2_params.yaml")
     planner = params["planner_server"]["ros__parameters"]["GridBased"]
 
     assert planner["plugin"] == "nav2_navfn_planner/NavfnPlanner"
-    assert 0.18 <= planner["tolerance"] <= 0.22
+    assert planner["tolerance"] == 0.0
     assert planner["use_astar"] is True
     assert planner["allow_unknown"] is True
+    launch = (WORKSPACE / "ros2_ws/src/go2_navigation/launch/go2_nav2.launch.py").read_text()
+    assert "go2_navigation::ExactGoalSmac2D" in launch
 
 
 def test_pointcloud_defaults_use_latest_frame_without_rotational_smear():
@@ -130,8 +119,8 @@ def test_pointcloud_defaults_use_latest_frame_without_rotational_smear():
     assert "DeclareLaunchArgument('cloud_max_height', default_value='0.37')" in launch
     assert "DeclareLaunchArgument('fixed_cloud_frame', default_value='livox_frame')" in launch
     assert "DeclareLaunchArgument('scan_min_height', default_value='-2.00')" in launch
-    assert "'point_spread_radius': 0.04" in launch
-    assert "'max_fill_gap_bins': 3" in launch
+    assert "'point_spread_radius': 0.025" in launch
+    assert "'max_fill_gap_bins': 2" in launch
     assert "DeclareLaunchArgument('max_history_age', default_value='0.12')" in launch
     assert "'queue_size': 1" in launch
 
@@ -156,18 +145,20 @@ def test_terrain_profiles_remain_available_for_navigation_tuning():
         "ros2_ws/src/go2_navigation/launch/go2_localization.launch.py",
     ):
         launch = (WORKSPACE / relative_path).read_text(encoding="utf-8")
-        assert 'DeclareLaunchArgument("cloud_topic", default_value="/livox/lidar")' in launch
-        assert 'default_value="-0.33"' in launch
-        assert 'DeclareLaunchArgument("fixed_cloud_frame", default_value="livox_frame")' in launch
-        assert '"livox_hap.launch.py"' in launch
+        assert "OpaqueFunction(function=launch_planar_perception)" in launch
+        assert "*perception_arguments()" in launch
         assert '"odom_source": "sport_mode_state"' in launch
 
 
-def test_run_mapping_uses_the_validated_hap_height_slice():
+def test_run_mapping_uses_the_unitree_default_and_keeps_hap_height_slice_available():
     script = (WORKSPACE / "scripts/run_mapping.sh").read_text(encoding="utf-8")
-
-    assert "cloud_min_height:=-0.33" in script
-    assert "cloud_max_height:=0.37" in script
+    perception = (WORKSPACE / "ros2_ws/src/go2_navigation/go2_navigation/planar_perception.py").read_text()
+    assert "go2_mapping.launch.py" in script and '"$@"' in script
+    assert 'DeclareLaunchArgument("lidar_source", default_value="unitree", choices=["unitree", "hap"])' in perception
+    assert '"projection_cloud_topic": "/unitree/navigation_cloud_planar"' in perception
+    assert '"livox_hap.launch.py"' in perception
+    assert 'DeclareLaunchArgument("cloud_min_height", default_value="-0.33")' in perception
+    assert 'DeclareLaunchArgument("cloud_max_height", default_value="0.37")' in perception
 
 
 def test_go2_base_defaults_to_non_utlidar_odometry():
