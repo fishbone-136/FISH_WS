@@ -311,17 +311,20 @@ class NavigationPage(QWidget):
         self.status_label.setWordWrap(True)
         self.status_label.setMinimumHeight(42)
         self._set_status("waiting", "等待 ROS 2")
+        self.safety_label = QLabel("等待实时安全检测数据")
+        self.safety_label.setAlignment(Qt.AlignCenter)
         self.pose_label = QLabel("位姿: x=--  y=--  yaw=--")
         self.pose_label.setAlignment(Qt.AlignCenter)
         self.feedback_label = QLabel("距离目标: --")
         self.feedback_label.setAlignment(Qt.AlignCenter)
-        for label in (self.status_label, self.pose_label, self.feedback_label):
+        for label in (self.status_label, self.safety_label, self.pose_label, self.feedback_label):
             label.setWordWrap(True)
             label.setMinimumWidth(0)
             label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
-        for label in (self.pose_label, self.feedback_label):
+        for label in (self.safety_label, self.pose_label, self.feedback_label):
             label.setProperty('role', 'metric')
         status_frame.layout.addWidget(self.status_label)
+        status_frame.layout.addWidget(self.safety_label)
         status_frame.layout.addWidget(self.pose_label)
         status_frame.layout.addWidget(self.feedback_label)
         side_layout.addWidget(status_frame)
@@ -329,10 +332,10 @@ class NavigationPage(QWidget):
         launch_frame = NeonFrame("运行模式")
         self.mode_combo = QComboBox()
         self.mode_combo.addItems([
-            "自动启动 / 接入 2.5D",
+            "本体雷达 2.5D / 接入已有导航",
             "仅连接已有导航",
         ])
-        self.mode_combo.setToolTip('默认：进入本页自动启动 2.5D 导航，或接入已有导航')
+        self.mode_combo.setToolTip('进入本页时优先接入已有导航，否则用 Go2 本体雷达启动 2.5D 导航')
         launch_buttons = QHBoxLayout()
         self.start_button = QPushButton("启动 / 重试")
         self.start_button.clicked.connect(self._start_stack)
@@ -376,7 +379,7 @@ class NavigationPage(QWidget):
         action_row.addWidget(cancel)
         pose_frame.layout.addLayout(action_row)
         aux_row = QHBoxLayout()
-        hint = QLabel('优先使用地形视图中的 Nav2 Goal 选点；手动输入坐标使用 odom_lio。')
+        hint = QLabel('可用地形视图中的 Nav2 Goal 选点。手动坐标使用当前地图坐标系。')
         hint.setWordWrap(True)
         hint.setProperty('role', 'hint')
         aux_row.addWidget(hint)
@@ -540,8 +543,8 @@ class NavigationPage(QWidget):
             return
         args = [str(Path(__file__).with_name('stack_launcher.py'))]
         self._launch_output_tail.clear()
-        self._append_log('正在启动当前 2.5D 地形导航…')
-        self._set_status('waiting', '正在启动 2.5D 导航，检查连接与站姿…')
+        self._append_log('正在以 Go2 本体雷达启动 2.5D 导航…')
+        self._set_status('waiting', '正在检查本体雷达连接与站姿…')
         self._launch_process.setProcessEnvironment(QProcessEnvironment.systemEnvironment())
         self._launch_process.start(sys.executable, args)
         self._sync_controls()
@@ -579,7 +582,7 @@ class NavigationPage(QWidget):
         if self._navigation_closed or self._control_pending == 'close':
             return
         self._navigation_state, self._last_navigation_message = state, message
-        if state in ('ready', 'paused', 'fault'):
+        if state in ('ready', 'paused', 'fault', 'preview'):
             if self._ready_timer.isActive():
                 if state == 'ready':
                     self._append_log('2.5D 导航已就绪，可以选择目标点。')
@@ -610,11 +613,16 @@ class NavigationPage(QWidget):
     def _sync_controls(self):
         ready = self._navigation_state == 'ready'
         paused = self._navigation_state == 'paused'
+        preview = self._navigation_state == 'preview'
         pending = bool(self._control_pending)
-        self.start_button.setEnabled(not pending and not ready and self._navigation_state != 'fault'
+        warning = self._capabilities.get('motion_safety_warning', '等待实时安全检测数据')
+        lidar = {'unitree': '本体雷达', 'hap': 'HAP 外接雷达'}.get(self._capabilities.get('lidar_source'))
+        safety_text = '导航已关闭' if self._navigation_closed else warning or '保护区净空'
+        self.safety_label.setText(f'{lidar} · {safety_text}' if lidar else safety_text)
+        self.start_button.setEnabled(not pending and not ready and not preview and self._navigation_state != 'fault'
                                     and (not self._navigation_closed or self._launch_process.state() == QProcess.NotRunning))
         self.start_button.setText('切换中…' if pending else '恢复导航' if paused else
-                                  '已启用' if ready else '启动 / 重试')
+                                  '已启用' if ready else '地图预览' if preview else '启动 / 重试')
         self.start_button.setToolTip('定位故障需重启导航进程' if self._navigation_state == 'fault' else
                                     '启动本机导航或恢复已停止的 Nav2；不会重复创建进程')
         self.stop_button.setEnabled(not pending and not self._navigation_closed and
@@ -622,9 +630,10 @@ class NavigationPage(QWidget):
              self._stop_requested or self._navigation_state == 'fault' or
              self._launch_process.state() != QProcess.NotRunning))
         goal_active = self._goal_active or self._goal_submitting
-        self.send_goal_button.setEnabled(ready and not pending and not goal_active)
+        self.send_goal_button.setEnabled(ready and not warning and not pending and not goal_active)
         self.send_goal_button.setToolTip('请先启用导航并等待地图、有效位姿就绪' if not ready else
-                                        '当前目标执行中，请先取消或等待完成' if goal_active else '发送目标坐标')
+                                        '当前目标执行中，请先取消或等待完成' if goal_active else
+                                        warning or '发送目标坐标')
         self.cancel_goal_button.setEnabled(goal_active and not pending and not self._navigation_closed)
         self.cancel_goal_button.setToolTip('取消本页或 RViz 中的目标' if goal_active else '当前没有执行中的目标')
         self.save_map_button.setEnabled(bool(self._capabilities.get('can_save')) and not self._saving_map
@@ -761,7 +770,7 @@ class NavigationPage(QWidget):
             self._startup_failed('导航启动失败 / 已退出：' + reason)
 
     def _send_goal(self) -> None:
-        if self._navigation_state != 'ready' or self._goal_submitting or self._goal_active or self._control_pending:
+        if not self.send_goal_button.isEnabled():
             self._append_log('导航未就绪或已有目标，未重复发送。')
             return
         self._goal_submitting = True
@@ -821,8 +830,9 @@ class NavigationPage(QWidget):
         self.log_box.appendPlainText(message)
 
     def shutdown(self) -> None:
+        if self._shutting_down:
+            return
         self._shutting_down = True
-        self.worker.terrain_publishers_updated.disconnect(self._ensure_terrain_display)
         if self._close_process.state() != QProcess.NotRunning:
             # Let the already requested shutdown finish even when the window closes.
             self._close_process.waitForFinished(22000)

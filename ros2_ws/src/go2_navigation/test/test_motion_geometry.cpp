@@ -142,3 +142,55 @@ TEST(MotionGeometry, AnImpassableDoorOnlyBlocksAPathThatActuallyEntersIt)
   EXPECT_FALSE(go2_navigation::path_enters_corridor(corridor, {{0.0, 0.0}, {0.3, 0.0}}));
   EXPECT_FALSE(go2_navigation::path_enters_corridor(corridor, {{0.0, 0.0}, {1.0, 0.8}}));
 }
+
+TEST(MotionGeometry, CentersInNarrowPassageDespiteQuantizedPathHeading)
+{
+  using go2_navigation::ObstaclePoint;
+  auto points = walls(.50, 0.0, 0.0);
+  for (auto & point : points) {point.y += .035;}
+  const auto corridor = go2_navigation::detect_path_corridor(points, .20, .70);
+  ASSERT_TRUE(corridor.detected);
+  EXPECT_NEAR(corridor.heading, 0., .03);
+  EXPECT_NEAR(corridor.width(), .50, .015);
+  EXPECT_GT(go2_navigation::corridor_center_yaw(corridor, .24, .65), 0.0);
+  EXPECT_FALSE(go2_navigation::detect_path_corridor(
+    std::vector<ObstaclePoint>{{.5, .23}, {.9, .23}, {1.3, .23}}, .0, .70).detected);
+}
+
+TEST(MotionGeometry, PureTurnCommitmentPreventsImmediateReversalButAllowsTranslation)
+{
+  go2_navigation::PureTurnCommitment turn;
+  turn.record(0.,0.,.56,10.,2.);
+  EXPECT_TRUE(turn.permits(0.,0.,.56,10.1,true));
+  EXPECT_FALSE(turn.permits(0.,0.,-.56,10.1,true));
+  EXPECT_TRUE(turn.permits(.22,0.,-.56,10.1,true));
+  EXPECT_TRUE(turn.permits(0.,0.,0.,10.1,true));
+}
+
+TEST(MotionGeometry, PureTurnCommitmentImmediatelyYieldsWhenOldSideIsBlocked)
+{
+  go2_navigation::PureTurnCommitment turn;
+  turn.record(0.,0.,-.56,10.,2.);
+  EXPECT_TRUE(turn.permits(0.,0.,.56,10.01,false));
+}
+
+TEST(MotionGeometry, PureTurnCommitmentIsBoundedAndDoesNotExtendOnEveryCycle)
+{
+  go2_navigation::PureTurnCommitment turn;
+  turn.record(0.,0.,.56,10.,2.);
+  for (int i=1;i<40;++i) {
+    const double now=10.+i*.05;
+    turn.record(0.,0.,.56,now,2.);
+    EXPECT_FALSE(turn.permits(0.,0.,-.56,now,true));
+  }
+  EXPECT_TRUE(turn.permits(0.,0.,-.56,12.01,true));
+}
+
+TEST(MotionGeometry, PureTurnCommitmentReleasesOnGoalChangeOrWalking)
+{
+  go2_navigation::PureTurnCommitment turn;
+  turn.record(0.,0.,.56,10.,2.);turn.reset();
+  EXPECT_TRUE(turn.permits(0.,0.,-.56,10.01,true));
+  turn.record(0.,0.,.56,10.,2.);turn.record(.22,0.,0.,10.01,2.);
+  EXPECT_TRUE(turn.permits(0.,0.,-.56,10.02,true));
+}

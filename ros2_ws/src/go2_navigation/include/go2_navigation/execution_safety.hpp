@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <cstring>
 #include <memory>
+#include <limits>
 #include <mutex>
 #include <stdexcept>
 #include <string>
@@ -25,17 +26,21 @@ namespace go2_navigation
 {
 // Use the same physical rectangle and constant-curvature arc as the final gate.
 // Exact measured/remembered endpoints avoid adding a second costmap-cell radius.
-inline bool execution_arc_clear(
+inline double execution_arc_contact_time(
   const std::vector<ObstaclePoint> & points, double vx, double vy, double wz,
-  double half_length, double half_width, double horizon)
+  double half_length, double half_width, double horizon, double center_x = 0.0,
+  bool ignore_initial_overlap = false)
 {
   const double speed = std::hypot(vx, vy);
-  const double radius = std::hypot(half_length, half_width) + speed * horizon;
+  const double radius = std::hypot(half_length + std::abs(center_x), half_width) +
+    speed * horizon;
   std::vector<const ObstaclePoint *> nearby;
   for (const auto & p : points) {
+    if (ignore_initial_overlap && std::abs(p.x - center_x) <= half_length &&
+      std::abs(p.y) <= half_width) {continue;}
     if (p.x * p.x + p.y * p.y <= radius * radius) {nearby.push_back(&p);}
   }
-  if (nearby.empty()) {return true;}
+  if (nearby.empty()) {return std::numeric_limits<double>::infinity();}
   const int steps = std::max({1, static_cast<int>(std::ceil(horizon / .04)),
       static_cast<int>(std::ceil(std::abs(wz) * horizon / .025)),
       static_cast<int>(std::ceil(speed * horizon / .02))});
@@ -46,18 +51,27 @@ inline bool execution_arc_clear(
     const double dy = std::abs(wz) < 1.e-6 ? vy * t : (vx * (1. - c) + vy * s) / wz;
     for (const auto * p : nearby) {
       const double x = p->x - dx, y = p->y - dy;
-      if (std::abs(c * x + s * y) <= half_length + 1.e-12 &&
-        std::abs(-s * x + c * y) <= half_width + 1.e-12) {return false;}
+      if (std::abs(c * x + s * y - center_x) <= half_length + 1.e-12 &&
+        std::abs(-s * x + c * y) <= half_width + 1.e-12) {return t;}
     }
   }
-  return true;
+  return std::numeric_limits<double>::infinity();
+}
+
+inline bool execution_arc_clear(
+  const std::vector<ObstaclePoint> & points, double vx, double vy, double wz,
+  double half_length, double half_width, double horizon)
+{
+  return !std::isfinite(execution_arc_contact_time(
+    points, vx, vy, wz, half_length, half_width, horizon));
 }
 
 struct ExecutionContext
 {
   bool enabled{false}, ready{false};
   double half_length{0.0}, half_width{0.0}, scan_age{0.0};
-  double response_time{.20}, approach_time{1.20};
+  double response_time{.20}, approach_time{1.20}, minimum_translation{.22};
+  double near_guard_start{0.0}, near_guard_end{0.0}, near_guard_half_width{0.0};
   std::vector<ObstaclePoint> raw, memory, points;
 
   bool allows(double vx, double vy, double wz) const
@@ -71,14 +85,34 @@ struct ExecutionContext
     if (!execution_arc_clear(points, vx, vy, wz, half_length, half_width, braking)) {
       return false;
     }
-    // The gate applies its 1.2 s contact fraction AFTER choosing a command.
-    // Reject those commands before DWB scoring instead of requesting a gait
-    // that will be reduced to a sustained, unusable 0.005--0.05 m/s afterwards.
+    // Sweep the projected counterpart of the raw HAP stop region as well.
+    // A body-safe arc can still approach a person closely enough to latch
+    // that interlock and leave the controller unable to finish the detour.
+    // The raw sensor remains authoritative for points already in the region.
+    if (near_guard_half_width > 0.0 && std::isfinite(execution_arc_contact_time(
+        raw, vx, vy, wz, (near_guard_end - near_guard_start) * 0.5,
+        near_guard_half_width, braking, (near_guard_start + near_guard_end) * 0.5, true)))
+    {
+      return false;
+    }
+    // Match the gate's soft contact-time slowdown instead of treating its
+    // entire approach horizon as a hard obstacle. Keep the full-speed braking
+    // test above: a gentle slowdown must never excuse an imminent collision.
     const double contact_horizon = scan_age + response_time + approach_time;
-    if (vx > 1.e-6 && !execution_arc_clear(
-        raw, vx, vy, wz, half_length, half_width, contact_horizon)) {return false;}
-    if (speed > 1.e-6 && !execution_arc_clear(
-        memory, vx, vy, wz, half_length, half_width, contact_horizon)) {return false;}
+    double contact = std::numeric_limits<double>::infinity();
+    if (vx > 1.e-6) {
+      contact = execution_arc_contact_time(
+        raw, vx, vy, wz, half_length, half_width, contact_horizon);
+    }
+    if (speed > 1.e-6) {
+      contact = std::min(contact, execution_arc_contact_time(
+        memory, vx, vy, wz, half_length, half_width, contact_horizon));
+    }
+    if (std::isfinite(contact)) {
+      const double scale = std::clamp(
+        (contact - scan_age - response_time) / approach_time, 0.0, 1.0);
+      if (speed * scale + 1.e-5 < minimum_translation) {return false;}
+    }
     return true;
   }
 };
@@ -113,6 +147,13 @@ public:
       (point_model ? (front != 0.0 || rear != 0.0 || half_width_ != 0.0) :
       std::min({front, rear, half_width_}) <= 0.0))
     {throw std::runtime_error("Execution geometry must match the explicit point/rectangle model");}
+    near_guard_start_ = parameter("raw_sensor_x", .14);
+    const double raw_guard_front = std::max(front, .38);
+    near_guard_end_ = raw_guard_front + .05;
+    near_guard_half_width_ = std::max(half_width_, .15) + .03;
+    if (!std::isfinite(near_guard_start_) || near_guard_start_ >= raw_guard_front) {
+      throw std::runtime_error("Invalid HAP position for the predicted near-contact guard");
+    }
     const auto qos = rclcpp::SensorDataQoS().keep_last(1);
     scan_sub_ = node->create_subscription<sensor_msgs::msg::LaserScan>(
       "/scan_safety", qos, [this](sensor_msgs::msg::LaserScan::ConstSharedPtr m) {
@@ -171,6 +212,10 @@ public:
       scan_age >= -.1 && scan_age <= .35 && receive_now - scan_received_ <= .35 &&
       memory_age >= -.05 && memory_age <= .75 && receive_now - memory_received_ <= .75;
     result.half_length = half_length_; result.half_width = half_width_;
+    result.minimum_translation = minimum_;
+    result.near_guard_start = near_guard_start_;
+    result.near_guard_end = near_guard_end_;
+    result.near_guard_half_width = near_guard_half_width_;
     // Reserve one control/transport interval beyond the current scan age.
     result.scan_age = std::max(0.0, scan_age) + .10;
     if (!result.ready) {return result;}
@@ -199,6 +244,7 @@ private:
   rclcpp::Clock::SharedPtr clock_;
   bool enabled_{false}, scan_supported_{false}, memory_supported_{false};
   double half_length_{0.0}, half_width_{0.0}, minimum_{.22};
+  double near_guard_start_{0.0}, near_guard_end_{0.0}, near_guard_half_width_{0.0};
   double scan_stamp_{-1.e30}, memory_stamp_{-1.e30};
   double scan_received_{-1.e30}, memory_received_{-1.e30};
   std::string base_frame_, memory_frame_;

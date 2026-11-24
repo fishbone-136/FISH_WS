@@ -32,10 +32,16 @@ from std_msgs.msg import Bool, String
 from std_srvs.srv import Trigger
 from tf2_ros import Buffer, TransformListener
 
+from background_budget import BackgroundBudget
 from go2_navigation.runtime_guard import acquire_process_lock
 from obstacle_memory_model import (ObstacleMemory,RayEvidence,navigation_grid,clearing_delta,
-                                   reference_clear_volumes,memory_checkpoint,restore_checkpoint)
+                                   reference_clear_volumes,memory_checkpoint,restore_checkpoint,
+                                   UNITREE_NEAR_CLEAR_RADIUS)
 from dynamic_obstacles import DynamicObstacles
+
+
+MAP_POLL_INTERVAL = .025
+LOADED_MAP_RATE = 8.
 
 
 def initialize_clearing_worker():
@@ -48,13 +54,18 @@ def yaw_of(q):
     return math.atan2(2*(q.w*q.z+q.x*q.y),1-2*(q.y*q.y+q.z*q.z))
 
 
-def lio_session_identity():
+def lio_session_identity(lidar_source='hap'):
     domain=os.environ.get('ROS_DOMAIN_ID','0')
     found=[]
     for proc in Path('/proc').glob('[0-9]*'):
         try:
             argv=[v for v in (proc/'cmdline').read_bytes().split(b'\0') if v]
-            if not argv or Path(argv[0].decode()).name!='fastlio_mapping':continue
+            if lidar_source == 'unitree':
+                owns_session = any(
+                    Path(arg.decode()).name == 'unitree_navigation_source.py' for arg in argv[:2])
+            else:
+                owns_session = bool(argv) and Path(argv[0].decode()).name == 'fastlio_mapping'
+            if not owns_session:continue
             env=dict(v.split('=',1) for v in (proc/'environ').read_text().split('\0') if '=' in v)
             if env.get('ROS_DOMAIN_ID','0')!=domain:continue
             fields=(proc/'stat').read_text().rsplit(')',1)[1].split()
@@ -63,7 +74,7 @@ def lio_session_identity():
     if len(found)==1:return found[0]
     if not found and os.environ.get('ROS_LOCALHOST_ONLY')=='1' and domain!='0':
         return {'isolated_test_domain':domain}
-    raise ValueError('Cannot identify one owning FAST-LIO process')
+    raise ValueError('Cannot identify one owning localization process')
 
 
 def full_pose_transform(odometry,relative):
@@ -128,7 +139,8 @@ def world_ground_plane(message,transform):
 
 
 def compute_clearing_delta(geometry,stamp,previous_stamp,pose,cloud,transform,clear_window,
-                           ground_plane=None,dynamic_flags=None,transient_flags=None):
+                           ground_plane=None,dynamic_flags=None,transient_flags=None,
+                           near_clearance_cloud=None):
     """Transfer compact numeric geometry in and sparse confirmation changes out."""
     started=time.perf_counter()
     points,origin=cloud_points(cloud,transform)
@@ -136,12 +148,18 @@ def compute_clearing_delta(geometry,stamp,previous_stamp,pose,cloud,transform,cl
     # Robot returns must not veto clearing of external obstacle history.
     c,s=math.cos(pose[2]),math.sin(pose[2]);delta=points[:,:2]-pose[:2]
     bx=c*delta[:,0]+s*delta[:,1];by=-s*delta[:,0]+c*delta[:,1]
-    points=points[(np.abs(bx)>=.40)|(np.abs(by)>=.24)]
+    # Match projection: front edge is 5 cm ahead of HAP (base x=.14).
+    points=points[(bx<=-.40)|(bx>=.19)|(np.abs(by)>=.24)]
+    near_rays=None
+    if near_clearance_cloud is not None:
+        near_points,_=cloud_points(near_clearance_cloud,transform)
+        near_rays=RayEvidence(near_points,origin,minimum_horizontal_range=.01)
     updates=clearing_delta(geometry,RayEvidence(points,origin),pose,stamp,previous_stamp,
                            # The parent checks sensor continuity; this gap is
                            # between background jobs, bounded by the evidence window.
                            clear_window=clear_window,max_gap=clear_window,ground_plane=ground_plane,
-                           dynamic_flags=dynamic_flags,transient_flags=transient_flags)
+                           dynamic_flags=dynamic_flags,transient_flags=transient_flags,
+                           near_fast=True,near_rays=near_rays)
     return updates,1000*(time.perf_counter()-started)
 
 
@@ -150,20 +168,22 @@ class RememberedObstacles(Node):
         super().__init__('obstacle_memory')
         acquire_process_lock('obstacle_memory')
         self.frame = self.declare_parameter('memory_frame','odom_lio').value
+        self.lidar_source = self.declare_parameter('lidar_source','hap').value
         self.body_frame = self.declare_parameter('body_frame','base_link').value
         clear_window=self.declare_parameter('clearing_confirmation_window',4.).value
         self.memory = ObstacleMemory(require_3d_clearing=True,max_observation_gap=.60,
                                      clear_window=clear_window)
         self.motion=DynamicObstacles(self.memory.resolution)
+        self.cpu_budget=BackgroundBudget()
         restore_file=self.declare_parameter('restore_state_file','').value
         self.checkpoint_restored=False
         if restore_file:
             restore_checkpoint(json.loads(Path(restore_file).read_text()),self.memory,
-                               self.frame,lio_session_identity(),self.motion)
+                               self.frame,lio_session_identity(self.lidar_source),self.motion)
             self.checkpoint_restored=True
-        self.memory_publish_rate=float(self.declare_parameter('memory_publish_rate',15.).value)
-        self.navigation_publish_rate=float(self.declare_parameter('navigation_publish_rate',10.).value)
-        self.clearing_rate=float(self.declare_parameter('clearing_rate',6.).value)
+        self.memory_publish_rate=float(self.declare_parameter('memory_publish_rate',20.).value)
+        self.navigation_publish_rate=float(self.declare_parameter('navigation_publish_rate',15.).value)
+        self.clearing_rate=float(self.declare_parameter('clearing_rate',12.).value)
         # A worker result is a timestamped geometric observation, not current
         # motion permission. Allow bounded computation/dispatch latency; the
         # merge still rejects every cell hit again after its snapshot.
@@ -180,6 +200,7 @@ class RememberedObstacles(Node):
         self.points_cache_key=None
         self.published_maps={}
         self.clearing_ground=None
+        self.deferred_reference_clears=deque(maxlen=128)
         self.tf = Buffer()
         self.listener = TransformListener(self.tf,self)
         self.pending = deque(maxlen=8)
@@ -189,8 +210,11 @@ class RememberedObstacles(Node):
         self.tf_failures = 0
         self.received_scans = self.received_poses = self.accepted_scans = 0
         self.skipped_pose = self.skipped_stale = 0
+        self.unclassified_scans = 0
         self.fault = None
         self.clouds={}
+        self.unitree_rays={}
+        self.unitree_ray_frame_paired=False
         self.ground_planes={}
         self.ground_frame_paired=False
         self.cloud_order=deque()
@@ -216,6 +240,9 @@ class RememberedObstacles(Node):
         self.clearing_observation_resets=0
         self.last_clearing_result_age=None
         self.next_clearing=0.
+        self.next_far_clearing=0.
+        self.near_pass_due = False
+        self.near_priority_jobs=0
         self.last_prune=0.
         self.processed=deque(maxlen=8)
         self.fast_processing_ms=self.max_fast_processing_ms=0.
@@ -243,14 +270,23 @@ class RememberedObstacles(Node):
             self.create_subscription(OccupancyGrid,'/traversability/'+label,
                 lambda m,key=label:self.maps.update({key:m}),latched)
         observations=self.declare_parameter('observation_topic','/obstacles/deskewed').value
-        latest_cloud=QoSProfile(depth=1,reliability=ReliabilityPolicy.BEST_EFFORT)
+        # FAST-LIO and the deskewed projector publish reliable clouds. Match
+        # them: losing a complete fragmented cloud starves exact-stamp pairing.
+        reliable_observations=observations=='/obstacles/deskewed'
+        latest_cloud=QoSProfile(depth=1,reliability=(ReliabilityPolicy.RELIABLE
+            if reliable_observations else ReliabilityPolicy.BEST_EFFORT))
         self.create_subscription(PointCloud2,observations,self.on_scan,latest_cloud)
         cloud_topic=self.declare_parameter('raw_cloud_topic','/cloud_registered_body').value
         # This callback only caches messages. Retain a short DDS queue so
         # occupied processing cannot drop the exact raw frame needed to pair
         # an independently projected observation for geometric clearing.
-        raw_cloud_qos=QoSProfile(depth=8,reliability=ReliabilityPolicy.BEST_EFFORT)
+        raw_cloud_qos=QoSProfile(depth=2 if cloud_topic=='/cloud_registered_body' else 8,
+            reliability=(ReliabilityPolicy.RELIABLE if cloud_topic=='/cloud_registered_body'
+                         else ReliabilityPolicy.BEST_EFFORT))
         self.create_subscription(PointCloud2,cloud_topic,self.on_cloud,raw_cloud_qos)
+        if self.lidar_source=='unitree':
+            self.create_subscription(PointCloud2,'/unitree/near_clearance_rays',
+                                     self.on_unitree_rays,raw_cloud_qos)
         ground_topic=self.declare_parameter('ground_plane_topic','/perception/deskewed_ground_plane').value
         self.create_subscription(PoseStamped,ground_topic,self.on_ground_plane,latest_cloud)
         # The bridge publishes this full 6-DoF pose only after the same health,
@@ -264,29 +300,38 @@ class RememberedObstacles(Node):
         # frames until the newest matching obstacle scan has already expired.
         self.create_subscription(Odometry,full_pose_topic,self.on_full_pose,1)
         self.create_subscription(Bool,'/lio/localization_valid',
-            lambda m:setattr(self,'localized',m.data),latched)
+            self.on_localization_valid,latched)
         # Occupied writes track the 15 Hz scan; slow 3-D clearing cannot block
         # TF reception, fresh obstacle writes or the 10 Hz protection snapshot.
         self.create_timer(.02,self.process)
         # Snapshot/pickle/merge work must not sit ahead of occupied writes in
         # every 20 ms processing tick. It has its own lower-rate callback.
-        # Poll completion without paying another entire 200 ms dispatch period.
-        # Dispatch itself stays limited to 5 Hz and never queues a second job.
-        self.create_timer(.04,self.update_clearing)
+        # Poll at 20 ms for the bounded dispatch interval. Completed
+        # clears reach the maps on the next poll.
+        # The dispatch rate stays bounded and only one job runs at a time.
+        self.create_timer(.02,self.update_clearing)
         self.memory_timer=self.create_timer(1./self.memory_publish_rate,self.publish_points)
         # Diagnostics need not reserialize the protective cloud or scan every
         # stored cell at the same rate as fresh obstacle evidence.
-        self.create_timer(.20,self.publish)
-        self.maps_timer=self.create_timer(1./self.navigation_publish_rate,self.publish_maps)
+        self.create_timer(.50,self.publish)
+        self.maps_timer=self.create_timer(MAP_POLL_INTERVAL,self.publish_maps)
         self.add_on_set_parameters_callback(self.update_rates)
         self.create_service(Trigger,'/safety/save_obstacle_memory',self.save_state)
         self.get_logger().info('Obstacle memory: bounded 3-D clear evidence; blind sectors retained')
+
+    def on_localization_valid(self, message):
+        self.localized = message.data
+        if not self.localized:
+            # Replace transient-local navigation snapshots immediately. Keep
+            # memory itself: loss of localization is not proof of free space.
+            self.publish_maps(force=True)
 
     def save_state(self,request,response):
         try:
             if not self.localized or self.pose is None or self.fault or self.stamp is None:
                 raise ValueError('Memory is not healthy for a checkpoint')
-            state=memory_checkpoint(self.memory,self.frame,lio_session_identity(),self.motion)
+            state=memory_checkpoint(
+                self.memory,self.frame,lio_session_identity(self.lidar_source),self.motion)
             root=Path(os.environ.get('GO2_HUMBLE_PROJECT_ROOT',Path(__file__).resolve().parents[4]))/'reports'
             path=root/('obstacle_memory_state_'+str(time.time_ns())+'.json')
             temporary=path.with_suffix('.tmp')
@@ -296,7 +341,7 @@ class RememberedObstacles(Node):
         return response
 
     def update_rates(self,parameters):
-        limits={'memory_publish_rate':30.,'navigation_publish_rate':15.,'clearing_rate':10.}
+        limits={'memory_publish_rate':30.,'navigation_publish_rate':15.,'clearing_rate':15.}
         updates={p.name:p.value for p in parameters if p.name in limits}
         for name,value in updates.items():
             if (not isinstance(value,(float,int)) or isinstance(value,bool) or
@@ -304,9 +349,8 @@ class RememberedObstacles(Node):
                 return SetParametersResult(successful=False,reason='Invalid memory rate: '+name)
         for name,value in updates.items():
             setattr(self,name,float(value))
-            timer={'memory_publish_rate':self.memory_timer,
-                   'navigation_publish_rate':self.maps_timer}.get(name)
-            if timer is not None:timer.timer_period_ns=int(1.e9/value)
+            if name == 'memory_publish_rate':
+                self.memory_timer.timer_period_ns = int(1.e9 / value)
         return SetParametersResult(successful=True)
 
     def on_cloud(self,msg):
@@ -324,6 +368,13 @@ class RememberedObstacles(Node):
         key=(msg.header.stamp.sec,msg.header.stamp.nanosec)
         self.ground_planes[key]=msg
         while len(self.ground_planes)>16:self.ground_planes.pop(next(iter(self.ground_planes)))
+        self.flush_reference_clears()
+
+    def on_unitree_rays(self,msg):
+        if msg.header.frame_id!='unitree_lidar_aligned':return
+        key=(msg.header.stamp.sec,msg.header.stamp.nanosec)
+        self.unitree_rays[key]=msg
+        while len(self.unitree_rays)>16:self.unitree_rays.pop(next(iter(self.unitree_rays)))
 
     def on_full_pose(self,msg):
         if msg.header.frame_id!=self.frame or not msg.child_frame_id:return
@@ -339,6 +390,7 @@ class RememberedObstacles(Node):
             # smaller subset of scans selected by the occupied-write worker.
             self.record_observation_continuity(stamp)
         self.process()
+        self.flush_reference_clears()
 
     def observation_transform(self,header):
         odom=self.full_poses[(header.stamp.sec,header.stamp.nanosec)]
@@ -356,17 +408,17 @@ class RememberedObstacles(Node):
                 self.last_clearing_result_age=self.get_clock().now().nanoseconds/1.e9-stamp
                 if (-.05<=self.last_clearing_result_age<=self.clearing_result_max_age and
                         stamp>=self.clearing_reset_stamp):
-                    cleared=[]
+                    cleared, cleared_keys = [], []
                     removed=self.memory.merge_delta(snapshot,self.clearing_keys,
-                        *updates,stamp,cleared_cells=cleared)
+                        *updates,stamp,cleared_cells=cleared,cleared_keys=cleared_keys)
                     self.clearing_removed+=removed
                     if removed:
                         self.occupancy_revision+=1
                         self.geometry=None
-                        self.motion.prune(self.memory.cells)
+                        self.motion.forget_cells(cleared_keys)
                         self.publish_clear_volumes(cleared,self.clearing_ground,stamp)
                         self.publish_points()
-                        self.publish_maps()
+                        self.publish_maps(force=True)
                     self.clearing_jobs+=1
                     self.last_clearing_stamp=stamp
                 else:self.stale_clearing_results+=1
@@ -376,6 +428,7 @@ class RememberedObstacles(Node):
                 self.ray_failures+=1;self.last_ray_error=str(exc)
             self.clearing=None;self.clearing_context=None;self.clearing_keys=None
         if self.fault:return
+        self.cpu_budget.sample()
         if self.clearing is not None or time.monotonic()<self.next_clearing:return
         now=self.get_clock().now().nanoseconds/1.e9
         for scan,pose in reversed(self.processed):
@@ -388,7 +441,7 @@ class RememberedObstacles(Node):
             # Missing measured ground forbids floor/column inference, not
             # genuine free 3-D beam segments in the paired raw cloud. Infinity
             # and projected/expanded endpoints are never used as ray proof.
-            positive_only=any(f.name=='positive_only' for f in scan.fields)
+            positive_only=any(f.name in ('positive_only','unclassified') for f in scan.fields)
             cloud=self.clouds.get((scan.header.stamp.sec,scan.header.stamp.nanosec))
             if cloud is None:continue
             try:
@@ -399,11 +452,24 @@ class RememberedObstacles(Node):
             # the rest in the main memory, including every blind rear obstacle.
             # Use the actual 6-DoF sensor translation for the range envelope.
             origin=transform.transform.translation
-            snapshot=self.memory.clearing_snapshot((origin.x,origin.y),stamp)
+            dispatch_time = time.monotonic()
+            sensor_xy = (origin.x, origin.y)
+            near_only = self.near_pass_due or dispatch_time < self.next_far_clearing
+            snapshot=self.memory.clearing_snapshot(sensor_xy,stamp,
+                near_position=pose[:2],near_only=near_only,moving_cells=self.motion.dynamic_cells)
+            if not snapshot and near_only and dispatch_time >= self.next_far_clearing:
+                # The reserved near pass has nothing to check. Use this same
+                # observation for the due far pass instead of burning a frame.
+                near_only = False
+                snapshot = self.memory.clearing_snapshot(sensor_xy, stamp,
+                    near_position=pose[:2], moving_cells=self.motion.dynamic_cells)
             self.clearing_candidates=len(snapshot)
             if not snapshot:
+                self.near_pass_due = False
                 self.last_clearing_stamp=stamp
-                self.next_clearing=time.monotonic()+1./self.clearing_rate
+                self.next_clearing=dispatch_time+1./self.clearing_rate
+                if not near_only:
+                    self.next_far_clearing=time.monotonic()+(.5 if self.cpu_budget.overloaded else .25)
                 return
             self.clearing_context=(snapshot,stamp)
             self.clearing_keys=list(snapshot)
@@ -417,6 +483,11 @@ class RememberedObstacles(Node):
             self.clearing_ground=ground
             geometry=np.fromiter(chain.from_iterable(snapshot.values()),dtype=float,
                                  count=7*len(snapshot)).reshape(-1,7)
+            near_cloud=None
+            if (cloud.header.frame_id=='unitree_lidar_aligned' and self.unitree_rays and
+                    np.any(np.sum((geometry[:,:2]-pose[:2])**2,axis=1)<=UNITREE_NEAR_CLEAR_RADIUS**2)):
+                near_cloud=self.unitree_rays.get((scan.header.stamp.sec,scan.header.stamp.nanosec))
+            self.unitree_ray_frame_paired=near_cloud is not None
             try:
                 # Worker scheduling gaps do not imply missing sensor data.
                 # Reset only after an actual accepted-observation gap. The
@@ -429,10 +500,15 @@ class RememberedObstacles(Node):
                 self.transient_clearing_candidates=int(np.count_nonzero(transient))
                 self.clearing=self.worker.submit(compute_clearing_delta,geometry,stamp,
                     previous_stamp,pose,cloud,transform,self.memory.clear_window,ground,
-                    self.motion.flags(self.clearing_keys),transient)
+                    self.motion.flags(self.clearing_keys),transient,near_cloud)
             except BrokenProcessPool as exc:
                 self.fail_clearing_worker(exc)
-            self.next_clearing=time.monotonic()+1./self.clearing_rate
+            self.next_clearing=dispatch_time+1./self.clearing_rate
+            # A broad job may take longer than the far deadline. Always give
+            # close obstacles one dedicated pass before another broad job.
+            self.near_pass_due = not near_only
+            if near_only:self.near_priority_jobs+=1
+            else:self.next_far_clearing=time.monotonic()+(.5 if self.cpu_budget.overloaded else .25)
             return
 
     def fail_clearing_worker(self,error):
@@ -496,16 +572,27 @@ class RememberedObstacles(Node):
                 return
             pose = (tf.transform.translation.x,tf.transform.translation.y,yaw_of(tf.transform.rotation))
             stamp = scan.header.stamp.sec+scan.header.stamp.nanosec/1.e9
+            fields={f.name for f in scan.fields}
+            self.raw_paired=(scan.header.stamp.sec,scan.header.stamp.nanosec) in self.clouds
+            if 'unclassified' in fields:
+                # The matching raw cloud can still prove a real 3-D crossing.
+                # Keep its timestamp for pairing, but leave obstacle geometry
+                # and the last classified safety snapshot untouched.
+                self.unclassified_scans+=1
+                self.observation_mode='unclassified'
+                self.processed.append((scan,pose))
+                self.pending.popleft()
+                return
             try:
                 started=time.perf_counter()
                 points,_=cloud_points(scan,tf)
                 # Preserve the pre-hit view for tracking, but publish occupied
                 # protection before clustering/motion classification. Tracking
                 # only relaxes subsequent clearing; it must not delay new hits.
-                tracking_memory=self.memory.cells.copy()
+                tracking_due='positive_only' not in fields and self.cpu_budget.due('tracking',10.,5.)
+                tracking_memory=self.memory.cells.copy() if tracking_due else None
                 accepted=self.memory.mark_xyz(points,pose,stamp)
                 self.geometry = None
-                self.raw_paired=(scan.header.stamp.sec,scan.header.stamp.nanosec) in self.clouds
                 self.fast_processing_ms=1000*(time.perf_counter()-started)
                 self.max_fast_processing_ms=max(self.max_fast_processing_ms,self.fast_processing_ms)
             except Exception as exc:
@@ -518,15 +605,15 @@ class RememberedObstacles(Node):
                 self.pose,self.stamp=pose,scan.header.stamp
                 self.base_world_z=tf.transform.translation.z
                 self.last_observation_error=None
-                self.observation_mode=('positive_only' if any(
-                    f.name=='positive_only' for f in scan.fields) else 'measured_ground')
+                self.observation_mode='positive_only' if 'positive_only' in fields else 'measured_ground'
                 self.processed.append((scan,pose))
                 # Send new protection evidence immediately rather than wait
                 # for another timer turn behind clouds, maps and TF callbacks.
                 self.publish_points()
                 try:
                     tracking_started=time.perf_counter()
-                    self.motion.observe(points,pose,stamp,tracking_memory)
+                    if tracking_due:
+                        self.motion.observe(points,pose,stamp,tracking_memory)
                     if time.monotonic()-self.last_prune>=1.:
                         self.memory.cells={k:p for k,p in self.memory.cells.items()
                             if (p[0]-pose[0])**2+(p[1]-pose[1])**2<=self.memory.radius**2}
@@ -586,7 +673,25 @@ class RememberedObstacles(Node):
         self.points_cache_key,self.points_cache=key,msg
         self.points_pub.publish(msg)
 
+    def flush_reference_clears(self):
+        if not self.deferred_reference_clears or not self.localized:return
+        now=self.get_clock().now().nanoseconds/1.e9
+        for key,plane in reversed(list(self.ground_planes.items())):
+            if key not in self.full_poses:continue
+            if not -.05<=now-key[0]-key[1]/1.e9<=.5:continue
+            try:ground=world_ground_plane(plane,self.observation_transform(plane.header))
+            except Exception:continue
+            # Keep the ORIGINAL proof timestamp: newer real observations must
+            # never be removed by a delayed display-only clearing notification.
+            pending=list(self.deferred_reference_clears)
+            self.deferred_reference_clears.clear()
+            for cells,stamp in pending:self.publish_clear_volumes(cells,ground,stamp)
+            return
+
     def publish_clear_volumes(self,cells,ground,stamp):
+        if ground is None:
+            self.deferred_reference_clears.append((cells,stamp))
+            return
         volumes=reference_clear_volumes(cells,ground)
         if not len(volumes):return
         msg=PointCloud2();msg.header.frame_id=self.frame
@@ -623,17 +728,21 @@ class RememberedObstacles(Node):
                                           if math.isfinite(cell[3]) else None)})
         self.status_pub.publish(String(data=json.dumps({
             'localized':self.localized,'cells':len(self.memory.cells),'scan_age':age,
+            'background_cpu_limited':self.cpu_budget.overloaded,
+            'host_cpu_busy':self.cpu_budget.busy,
             'observation_mode':self.observation_mode,
             'validated_pose_source':self.validated_pose_source,
             'received_scans':self.received_scans,'received_poses':self.received_poses,
             'accepted_scans':self.accepted_scans,'skipped_pose':self.skipped_pose,
-            'skipped_stale':self.skipped_stale,
+            'skipped_stale':self.skipped_stale,'unclassified_scans':self.unclassified_scans,
             'cleared_cells':self.memory.cleared,'raw_frame_paired':self.raw_paired,
-            'clearing_policy':'motion_evidence_v7_near_volume',
+            'unitree_ray_frame_paired':self.unitree_ray_frame_paired,
+            'clearing_policy':'motion_evidence_v11_moving_priority',
             'dynamic_tracks_confirmed':self.motion.confirmed_tracks,
             'dynamic_history_cells':len(self.motion.dynamic_cells),
             'checkpoint_restored':self.checkpoint_restored,
             'ground_frame_paired':self.ground_frame_paired,
+            'deferred_reference_clears':len(self.deferred_reference_clears),
             'clearing_transport':'numeric_delta_v1',
             'memory_publish_rate':self.memory_publish_rate,
             'navigation_publish_rate':self.navigation_publish_rate,
@@ -642,8 +751,8 @@ class RememberedObstacles(Node):
             'clearing_result_max_age':self.clearing_result_max_age,
             'last_clearing_result_age':self.last_clearing_result_age,
             'clearing_observation_resets':self.clearing_observation_resets,
-            'clearing_jobs':self.clearing_jobs,'clearing_candidates':self.clearing_candidates,
-            'transient_clearing_policy':'grouped_ground_evidence_v1',
+            'clearing_jobs':self.clearing_jobs,'near_priority_jobs':self.near_priority_jobs,'clearing_candidates':self.clearing_candidates,
+            'transient_clearing_policy':'grouped_ground_evidence_v2',
             'transient_clearing_candidates':self.transient_clearing_candidates,
             'clearing_removed_cells':self.clearing_removed,
             'processing_ms':round(self.last_processing_ms,3),
@@ -660,8 +769,34 @@ class RememberedObstacles(Node):
             'unconfirmed_height_cells':int(np.isnan(geometry[:,5]).sum()),
             'base_height_world':self.base_world_z,'near_body_observations':near_body[:20],
             'tf_waits':self.tf_failures,'fault':self.fault})))
-    def publish_maps(self):
+    def publish_maps(self,force=False):
+        if force:
+            # A proven removal must erase the costmap/halo now, rather than
+            # sit behind the optional background publication deadline.
+            self.cpu_budget.last_jobs['maps']=time.monotonic()
+        elif not self.cpu_budget.due('maps', self.navigation_publish_rate,
+                                     min(LOADED_MAP_RATE, self.navigation_publish_rate),
+                                     poll_interval=MAP_POLL_INTERVAL):
+            return
         if not self.localized or self.pose is None or self.fault is not None:
+            for key, source in list(self.maps.items()):
+                revision = ('unavailable', id(source), self.map_resolutions[key])
+                if self.published_maps.get(key) == revision:
+                    continue
+                out = OccupancyGrid()
+                out.header, out.info = deepcopy(source.header), deepcopy(source.info)
+                out.header.stamp = self.get_clock().now().to_msg()
+                # Preserve the exact navigation geometry, including noninteger
+                # resolution ratios, but never retain an old occupied/free cell.
+                grid, resolution = navigation_grid(
+                    np.full(source.info.width*source.info.height, -1, dtype=np.int8),
+                    source.info.width, source.info.height, source.info.resolution,
+                    self.map_resolutions[key])
+                out.info.resolution = resolution
+                out.info.height, out.info.width = grid.shape
+                out.data = array('b'); out.data.frombytes(grid.tobytes())
+                self.map_publishers[key].publish(out)
+                self.published_maps[key] = revision
             return
         world=self.geometry_snapshot()[:, :2]
         for key,source in list(self.maps.items()):

@@ -44,6 +44,8 @@ class MemoryFixture(Fixture):
         super().__init__()
         self.destroy_publisher(self.command)
         self.command=self.create_publisher(Twist,'/cmd_vel_safe',1)
+        self.raw_cloud=self.create_publisher(PointCloud2,'/livox/lidar',qos_profile_sensor_data)
+        self.create_timer(.05,self.publish_raw_visibility)
         self.health=self.create_publisher(Bool,'/lio/localization_valid',
             QoSProfile(depth=1,durability=DurabilityPolicy.TRANSIENT_LOCAL))
         self.create_timer(.05,lambda:self.health.publish(Bool(data=True)))
@@ -74,6 +76,10 @@ class MemoryFixture(Fixture):
             stamp=self.frame_stamp
             if stamp is None:return
             self.empty_observations.publish(cloud_message(np.empty((0,3)),stamp,'base_link'))
+
+    def publish_raw_visibility(self):
+        points = np.array([[2., 0., 0.], [2., .05, .1], [2., -.05, -.1]])
+        self.raw_cloud.publish(cloud_message(points,self.get_clock().now().to_msg(),'livox_frame'))
 
     def wait(self,seconds):
         end=time.monotonic()+seconds
@@ -217,19 +223,20 @@ def dynamic_crossing(f,start,executable,memory):
     f.scan_override=[]
     memory.send_signal(signal.SIGINT);f.until(lambda:memory.poll() is not None,timeout=6.)
     start(['/usr/bin/python3',str(executable/'obstacle_memory.py'),'--ros-args',
+           '-p','global_navigation_resolution:=0.04',
            '-p','raw_cloud_topic:=/test/cloud_fast','-p','full_pose_topic:=/odom',
            '-p','restore_state_file:='+saved.message])
     f.until(lambda:f.memory_status.get('checkpoint_restored') and leg_cost()==100,timeout=8.)
     f.wait(1.);assert leg_cost()==100
     print('PASS checkpoint reload retains an unobserved leg in the same session',flush=True)
-    from pathlib import Path
     report={'peak_trail_occupied_cells':peak,'memory_clear_seconds':memory_seconds,
             'inflation_clear_seconds':cost_seconds,'static_leg_retained':True,
             'checkpoint_restored':True,'checkpoint':saved.message}
     report['static_baseline_memory_cells']=baseline_memory
     report['static_baseline_cost_cells']=baseline_cost
     name='mixed_crossing_measurement.json' if mixed else 'dynamic_crossing_measurement.json'
-    Path('/home/fishbone/HAP_ws/reports',name).write_text(
+    root=Path(os.environ.get('GO2_HUMBLE_PROJECT_ROOT',Path(__file__).resolve().parents[4]))
+    (root/'reports'/name).write_text(
         json.dumps(report,indent=2))
 
 
@@ -246,6 +253,7 @@ def main():
                '-r','obstacle_points:=/obstacles/deskewed',
                '-r','ground_plane:=/perception/deskewed_ground_plane',
                '-p','target_frame:=base_link','-p','ground_filter_enabled:=true',
+               '-p','use_best_effort:=false',
                '-p','observed_free_space_only:=true','-p','range_min:=0.25',
                '-p','range_max:=5.5','--log-level','warn'])
         if '--slow-clearing' in sys.argv:
@@ -257,7 +265,8 @@ def main():
             memory=start(['/usr/bin/python3','-c',code])
         else:
             memory=start(['/usr/bin/python3',str(executable/'obstacle_memory.py'),
-                          '--ros-args','-p','raw_cloud_topic:=/test/cloud_fast','-p','full_pose_topic:=/odom'])
+                          '--ros-args','-p','global_navigation_resolution:=0.04',
+                          '-p','raw_cloud_topic:=/test/cloud_fast','-p','full_pose_topic:=/odom'])
         if '--refresh-only' in sys.argv:
             obstacle_refresh(f,start)
             return
@@ -317,29 +326,40 @@ def main():
         route=f.plan(target)
         assert max(abs(p.pose.position.y) for p in route.poses)>.25
         print('PASS a Nav2 clear-costmap recovery does not erase independent obstacle memory',flush=True)
-        def current_scan_cost():
-            m=f.costmap
-            if m is None:return None
-            values=[]
-            for dx in (-.06,0.,.06):
-                for dy in (-.06,0.,.06):
-                    ix=int((3.+dx-m.info.origin.position.x)/m.info.resolution)
-                    iy=int((.8+dy-m.info.origin.position.y)/m.info.resolution)
-                    if 0<=ix<m.info.width and 0<=iy<m.info.height:
-                        values.append(m.data[iy*m.info.width+ix])
-            return max(values) if values else None
+        def current_scan_cost(half_extent=.06):
+            grid = f.costmap
+            if grid is None:
+                return None
+            info = grid.info
+            origin, resolution = info.origin.position, info.resolution
+            # The synthetic bearing rounds to a scan bin. Inspect every cell
+            # around its expected endpoint, including both sides of a grid edge.
+            x0 = max(0, math.floor((3. - half_extent - origin.x) / resolution))
+            x1 = min(info.width, math.floor((3. + half_extent - origin.x) / resolution) + 1)
+            y0 = max(0, math.floor((.8 - half_extent - origin.y) / resolution))
+            y1 = min(info.height, math.floor((.8 + half_extent - origin.y) / resolution) + 1)
+            cells = np.asarray(grid.data).reshape(info.height, info.width)[y0:y1, x0:x1]
+            return int(cells.max()) if cells.size else None
         f.forward_coverage=False;f.scan_override=[(1.,.8)]
         f.until(lambda:current_scan_cost()==100)
         f.scan_override=[]
         f.until(lambda:current_scan_cost()==0,timeout=5.)
         assert f.box_cost()==100
+        # Stop the scan entirely after marking a point. A zero-duration Nav2
+        # buffer repaints that point forever even as CurrentObstacleLayer resets.
+        f.scan_override=[(1.,.8)]
+        f.until(lambda:current_scan_cost()==100)
+        f.scan_override=None;f.enabled=False
+        f.until(lambda:current_scan_cost(.24)==0,timeout=2.)
+        assert f.box_cost()==100
+        f.scan_override=[];f.enabled=True
         f.forward_coverage=True
-        print('PASS current scan obstacle and inflation disappear without clearing rays; blind memory stays',flush=True)
+        print('PASS live scan obstacle and entire inflation halo expire when scans stop; blind memory stays',flush=True)
         f.yaw=math.pi
         f.wait(1.)
         assert f.box_cost()==100
         print('PASS after turning back, ground infinity/unknown rays cannot erase the box',flush=True)
-        f.x=1.65;f.command_linear=.55;f.command_angular=0.;f.command_enabled=True
+        f.x=1.90;f.command_linear=.55;f.command_angular=0.;f.command_enabled=True
         f.until(lambda:f.safe is not None and 0.<f.safe.linear.x<.4,timeout=8.)
         assert f.motion_diagnostic.get('remembered_points',0)>0
         print('PASS retained front obstacle slows motion even when the current scan misses it',flush=True)
@@ -350,9 +370,11 @@ def main():
         f.x=1.43
         f.until(lambda:f.safe.linear.x==0.)
         print('PASS the final gate stops before the remembered box despite missing current returns',flush=True)
-        f.command_linear=0.;f.command_angular=.65;f.x=1.46;f.y=-.50;f.yaw=0.
+        points = np.frombuffer(f.remembered_cloud.data,dtype='<f4').reshape(-1,3)
+        box_edge = float(points[np.abs(points[:,0]-1.)<.05,1].max())
+        f.command_linear=0.;f.command_angular=.65;f.x=1.30;f.y=box_edge+.195;f.yaw=0.
         f.wait(.6)
-        assert f.safe.angular.z==0.
+        assert f.safe.angular.z==0., f.motion_diagnostic
         f.command_angular=-.65
         f.until(lambda:f.safe.angular.z<-.2,timeout=8.)
         print('PASS remembered rear corner blocks a turn into it while allowing the away turn',flush=True)
@@ -386,7 +408,7 @@ def main():
         f.destroy_node()
         if rclpy.ok():rclpy.shutdown()
         for p in reversed(children):
-            if p.poll() is None:os.killpg(p.pid,signal.SIGINT)
+            if p.poll() is None:p.send_signal(signal.SIGINT)
         for p in children:
             try:p.wait(timeout=6)
             except subprocess.TimeoutExpired:os.killpg(p.pid,signal.SIGKILL);p.wait(timeout=3)

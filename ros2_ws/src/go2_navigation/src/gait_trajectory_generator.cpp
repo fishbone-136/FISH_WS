@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include <cmath>
+#include <algorithm>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -55,18 +56,42 @@ public:
       k.getDecelX(), sim_time_, k.getMinX());
     const double high = dwb_plugins::projectVelocity(current.x, k.getAccX(),
       k.getDecelX(), sim_time_, k.getMaxX());
-    const auto original = samples_;
+    // Focus supplemental walking arcs on the near-obstacle envelope instead
+    // of repeating high-yaw samples which the safety critic always rejects.
+    const double theta_low = dwb_plugins::projectVelocity(current.theta, k.getAccTheta(),
+      k.getDecelTheta(), sim_time_, k.getMinTheta());
+    const double theta_high = dwb_plugins::projectVelocity(current.theta, k.getAccTheta(),
+      k.getDecelTheta(), sim_time_, k.getMaxTheta());
+    auto append = [&](double x, double theta) {
+        if (theta < theta_low-1.e-5 || theta > theta_high+1.e-5) {return;}
+        const bool duplicate = std::any_of(samples_.begin(), samples_.end(),
+          [&](const auto & v) {return std::abs(v.x-x)<1.e-5 &&
+                   std::abs(v.y)<1.e-5 && std::abs(v.theta-theta)<1.e-5;});
+        if (!duplicate) {
+          nav_2d_msgs::msg::Twist2D v; v.x=x; v.theta=theta; samples_.push_back(v);
+        }
+      };
     for (double x : {minimum_, minimum_ + 0.02, minimum_ + 0.04}) {
       if (x < low - 1.e-5 || x > high + 1.e-5 ||
         (k.getMaxSpeedXY() >= 0.0 && x > k.getMaxSpeedXY() + 1.e-5)) {continue;}
-      for (const auto & base : original) {
-        if (std::abs(base.y) > 1.e-5) {continue;}
-        bool duplicate = false;
-        for (const auto & v : samples_) {
-          if (std::abs(v.x-x)<1.e-5 && std::abs(v.y)<1.e-5 &&
-            std::abs(v.theta-base.theta)<1.e-5) {duplicate = true; break;}
-        }
-        if (!duplicate) {auto v = base; v.x = x; samples_.push_back(v);}
+      for (double theta : {-.65, -.52, -.39, -.26, -.13, 0., .13, .26, .39, .52, .65}) {
+        append(x, theta);
+      }
+    }
+    // A tight turn can pass the braking check only near the gait minimum.
+    // The uniform grid can skip that boundary, even when it samples .65.
+    const double minimum_turn = k.getMinSpeedTheta();
+    const double caution_turn = std::min(.65, k.getMaxTheta());
+    if (low <= 1.e-5 && high >= -1.e-5 && caution_turn > 0. && minimum_turn <= caution_turn)
+    {
+      append(0., -caution_turn);
+      append(0., caution_turn);
+      if (minimum_turn > 0. && minimum_turn < caution_turn) {
+        const double middle = (minimum_turn + caution_turn) / 2.;
+        append(0., -minimum_turn);
+        append(0., minimum_turn);
+        append(0., -middle);
+        append(0., middle);
       }
     }
   }

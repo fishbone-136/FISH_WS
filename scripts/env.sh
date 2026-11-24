@@ -21,22 +21,24 @@ esac
 
 source /opt/ros/humble/setup.bash
 
-# HAP uses Livox ROS Driver 2 from a small underlay workspace.  Source it
-# explicitly before this project so a clean rebuild does not depend on a stale
-# prefix chain recorded in ros2_ws/install/setup.bash.
+env_file="${project_root}/go2_jiaohu/.env"
+if [[ -f "${env_file}" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "${env_file}"
+  set +a
+fi
+
+# A separate Livox installation is optional for the HAP fallback.
 livox_ws="${LIVOX_WS:-${project_root}/../GO2/livox_ws}"
 if [[ -f "${livox_ws}/install/setup.bash" ]]; then
   source "${livox_ws}/install/setup.bash"
   export LIVOX_WS="${livox_ws}"
-else
-  echo "未找到 Livox 工作区: ${livox_ws}/install/setup.bash" >&2
-  echo "请设置 LIVOX_WS，或先构建 livox_ros_driver2。" >&2
-  return 1 2>/dev/null || exit 1
 fi
 unset livox_ws
 
-if [[ -f "${project_root}/ros2_ws/install/setup.bash" ]]; then
-  source "${project_root}/ros2_ws/install/setup.bash"
+if [[ -f "${project_root}/ros2_ws/install/local_setup.bash" ]]; then
+  source "${project_root}/ros2_ws/install/local_setup.bash"
 fi
 
 # The Livox component is loaded with dlopen. Relocated build artifacts may
@@ -53,14 +55,6 @@ if [[ -f "${project_root}/.venv/bin/activate" ]]; then
   # 会使 Humble 的 tf_transformations 在导入时失败）。
   export PYTHONNOUSERSITE=1
   source "${project_root}/.venv/bin/activate"
-fi
-
-env_file="${project_root}/go2_jiaohu/.env"
-if [[ -f "${env_file}" ]]; then
-  set -a
-  # shellcheck disable=SC1090
-  source "${env_file}"
-  set +a
 fi
 
 # 确保桌面代理不会截获本机 Ollama 回环请求。
@@ -80,14 +74,6 @@ export HAP_NETWORK_INTERFACE="${HAP_NETWORK_INTERFACE:-enx00e04c3c2370}"
 export HAP_IP="${HAP_IP:-192.168.1.100}"
 if [[ ! "${GO2_NETWORK_INTERFACE}" =~ ^[A-Za-z0-9_.:-]+$ ]]; then
   echo "非法 GO2_NETWORK_INTERFACE: ${GO2_NETWORK_INTERFACE}" >&2
-  return 1 2>/dev/null || exit 1
-fi
-if [[ ! "${HAP_NETWORK_INTERFACE}" =~ ^[A-Za-z0-9_.:-]+$ ]]; then
-  echo "非法 HAP_NETWORK_INTERFACE: ${HAP_NETWORK_INTERFACE}" >&2
-  return 1 2>/dev/null || exit 1
-fi
-if [[ ! "${HAP_IP}" =~ ^[0-9A-Fa-f:.]+$ ]]; then
-  echo "非法 HAP_IP: ${HAP_IP}" >&2
   return 1 2>/dev/null || exit 1
 fi
 if [[ ! "${GO2_IP}" =~ ^[0-9A-Fa-f:.]+$ ]]; then

@@ -70,7 +70,7 @@ public:
       throw std::runtime_error("Invalid stable rotation controller limits");
     }
     RCLCPP_INFO(
-      logger_, "Stable rotation: fresh latest TF, rear-direction latch, %.2f rad/s path turn",
+      logger_, "Stable rotation: checked turn selection and measured yaw progress, %.2f rad/s path turn",
       rotate_to_heading_angular_vel_);
   }
 
@@ -83,6 +83,7 @@ public:
     if (!same_goal) {
       direction_.reset();
       goal_direction_.reset();
+      path_turn_.reset();
       in_rotation_ = false;
       last_angular_vel_ = 0.0;
       goal_capture_.reset();
@@ -141,7 +142,10 @@ public:
       sample.pose.position.x - pose.pose.position.x);
     const double tangent = std::atan2(sample.pose.position.y - sampled.first.pose.position.y,
       sample.pose.position.x - sampled.first.pose.position.x);
-    const auto detected = corridor_enabled_ ? detect_corridor(obstacles_,
+    // Use current wall observations for steering. Historical obstacles are
+    // still checked by the execution envelope and the local costmap.
+    const auto detected = corridor_enabled_ ? detect_path_corridor(
+      execution_.enabled ? execution_.raw : obstacles_,
       angles::shortest_angular_distance(yaw, tangent), corridor_max_width_) : Corridor{};
     if (detected.detected) {
       corridor_ = detected; corridor_misses_ = 0;
@@ -165,13 +169,40 @@ public:
         throw nav2_core::PlannerException("Observed corridor is narrower than the protected body on this path");
       }
     }
-    const double heading = narrow ? tangent : bearing;
+    const double heading = detected.detected ? yaw + detected.heading : narrow ? tangent : bearing;
     const double narrow_tolerance = narrow ? corridor_heading_tolerance(
       corridor_, footprint.first, footprint.second, corridor_margin_) : 0.0;
     const double disengage = narrow && narrow_tolerance > 0.0 ?
       std::min(angular_disengage_threshold_, 0.5 * narrow_tolerance) : angular_disengage_threshold_;
     const double engage = narrow && narrow_tolerance > 0.0 ?
       std::min(angular_dist_threshold_, 0.8 * narrow_tolerance) : angular_dist_threshold_;
+    const double sample_x = sample.pose.position.x - pose.pose.position.x;
+    const double sample_y = sample.pose.position.y - pose.pose.position.y;
+    const double c = std::cos(yaw), s = std::sin(yaw);
+    if (execution_.enabled && detected.detected && detected.width() <= .70 &&
+      detected.width() >= 2.0 * execution_.half_width &&
+      std::abs(detected.heading) <= .25 && goal_distance > position_approach_distance_ &&
+      path_enters_corridor(detected, {{c * sample_x + s * sample_y, -s * sample_x + c * sample_y}}))
+    {
+      // Centre between the measured walls with a slow arc. The grid path can
+      // be several centimetres off-centre even in a straight passage.
+      const double vx = std::min(.24, approach_speed_);
+      const double wz = corridor_center_yaw(detected, vx, forward_sampling_distance_);
+      if (vx >= execution_.minimum_translation && execution_.allows(vx, 0., wz) &&
+        walking_arc_clear(pose, vx, wz, std::min(simulate_ahead_time_, goal_distance / vx)))
+      {
+        geometry_msgs::msg::TwistStamped command;
+        command.header = pose.header;
+        command.twist.linear.x = vx;
+        command.twist.angular.z = wz;
+        in_rotation_ = false;
+        path_turn_.reset();
+        path_updated_ = false;
+        last_angular_vel_ = wz;
+        publish_diagnostic("corridor_center", command, narrow_tolerance);
+        return command;
+      }
+    }
     if (!rotate_to_goal_heading_ && goal_distance < position_approach_distance_) {
       // ControllerServer checks the strict goal radius after this command,
       // using a fresh pose. An independent stop here can make a single noisy
@@ -194,49 +225,38 @@ public:
       return rotate(error, yaw_tolerance, final_rotation_speed_, pose, min_final_rotation_speed_);
     }
 
+    const double shortest_error = angles::shortest_angular_distance(yaw, heading);
+    const double now = current_time.seconds();
+    path_turn_.update(heading, yaw, now);
     if (path_updated_ || in_rotation_ || narrow) {
-      const double error = direction_.error(angles::shortest_angular_distance(
-          yaw, heading));
       const double threshold = in_rotation_ ? disengage : engage;
-      const bool tracking_arc = handoff_.tracking(heading, error, disengage);
-      if (std::abs(error) > threshold && !tracking_arc) {
-        if (!in_rotation_) {
-          RCLCPP_INFO(logger_, "Aligning path: error %.2f rad, direction %s", error,
-            error > 0.0 ? "left" : "right");
-        }
+      const bool tracking_arc = handoff_.tracking(heading, shortest_error, disengage);
+      if (path_turn_.escape() &&
+        path_turn_.remaining(shortest_error, yaw) * path_turn_.direction() <= 0.07)
+      {
+        path_turn_.reset();
+        handoff_.blocked(heading);
+        in_rotation_ = false;
+        last_angular_vel_ = 0.0;
+        geometry_msgs::msg::TwistStamped stopped;
+        stopped.header = pose.header;
+        publish_diagnostic("escape_complete", stopped, narrow_tolerance);
+        return stopped;
+      }
+      if (std::abs(shortest_error) > threshold && !tracking_arc) {
         in_rotation_ = true;
-        try {
-          auto command = rotate(error, disengage, rotate_to_heading_angular_vel_,
-            pose, min_rotation_speed_);
-          publish_diagnostic(narrow ? "corridor_align" : "path_align", command, narrow_tolerance);
-          return command;
-        } catch (const RotationBlocked &) {
-          // A rear goal admits two initial turn directions. Check the other
-          // sweep before dropping into path tracking with the same blocked
-          // initial turn on every replan. Retain the selected direction at pi.
-          if (std::abs(error)>2.8) {
-            const double alternate=error-std::copysign(2.0*3.14159265358979323846,error);
-            if (checked_rotation_limit(alternate,rotate_to_heading_angular_vel_,min_rotation_speed_,pose)>0.) {
-              direction_.select(alternate);
-              if (last_angular_vel_*alternate<0.) {
-                geometry_msgs::msg::TwistStamped stopped;stopped.header=pose.header;
-                last_angular_vel_=0.;return stopped;
-              }
-              RCLCPP_INFO_THROTTLE(logger_,*clock_,2000,
-                "Rear alignment: blocked side rejected; taking the other checked turn");
-              return rotate(alternate,disengage,rotate_to_heading_angular_vel_,
-                            pose,min_rotation_speed_);
-            }
-          }
-          // A rectangular quadruped may lack room to rotate in place while a
-          // forward arc is clear. Let the primary controller try that arc with
-          // its full footprint critic, followed by the independent scan gate.
-          // Stale TF and all other errors still propagate as stop/retry.
-          RCLCPP_INFO_THROTTLE(logger_, *clock_, 2000,
-            "In-place alignment blocked; trying footprint-checked path tracking");
-          in_rotation_ = false;
-          handoff_.blocked(heading);
+        if (auto command = path_alignment(
+            pose, velocity.angular.z, heading, yaw, now, shortest_error, disengage))
+        {
+          publish_diagnostic(path_turn_.alternative() ? "alternate_align" :
+            narrow ? "corridor_align" : "path_align", *command, narrow_tolerance);
+          return *command;
         }
+        // A translating arc may fit when the quadruped cannot pivot in place.
+        in_rotation_ = false;
+        handoff_.blocked(heading);
+      } else if (std::abs(shortest_error) <= threshold) {
+        path_turn_.reset();
       }
       path_updated_ = false;
       if (in_rotation_) {
@@ -272,19 +292,75 @@ public:
     if (!execution_.allows(command.twist.linear.x, command.twist.linear.y,
       command.twist.angular.z))
     {
+      handoff_.reset();
+      path_updated_ = true;
       throw nav2_core::PlannerException("Selected command is not physically executable");
     }
-    last_angular_vel_ = command.twist.angular.z;
-    if (speed < 0.10) {
-      // Only a useful translating arc earns a persistent handover. Retaining
-      // a pure-turn DWB fallback can otherwise trap a rear goal in yaw hunting.
-      handoff_.reset(); path_updated_ = true;
+    if (speed >= 0.10) {
+      path_turn_.reset();
+    } else if (path_turn_.stalled() && command.twist.angular.z * path_turn_.direction() > 0.) {
+      last_angular_vel_ = 0.;
+      throw nav2_core::PlannerException("Path tracking selected a turn with no measured progress");
     }
+    last_angular_vel_ = command.twist.angular.z;
     publish_diagnostic(narrow ? "corridor_track" : "path_track", command, narrow_tolerance);
     return command;
   }
 
 private:
+  std::optional<geometry_msgs::msg::TwistStamped> path_alignment(
+    const geometry_msgs::msg::PoseStamped & pose, double measured_angular,
+    double heading, double yaw, double now, double shortest_error, double tolerance)
+  {
+    const double error = path_turn_.remaining(shortest_error, yaw);
+    const bool continuing = path_turn_.active() && error * path_turn_.direction() > 0.;
+    const bool stalled = continuing && path_turn_.stalled();
+    const auto checked_command = [&](double turn, double target_tolerance)
+      -> std::optional<geometry_msgs::msg::TwistStamped> {
+        const double limit = checked_rotation_limit(
+          turn, rotate_to_heading_angular_vel_, min_rotation_speed_, pose);
+        if (limit <= 0.) {return std::nullopt;}
+        const double direction = std::copysign(1., turn);
+        if (last_angular_vel_ * direction < 0. || measured_angular * direction < -0.10) {
+          last_angular_vel_ = 0.;
+          geometry_msgs::msg::TwistStamped stopped;
+          stopped.header = pose.header;
+          return stopped;
+        }
+        try {
+          return rotate(turn, target_tolerance, rotate_to_heading_angular_vel_,
+            pose, min_rotation_speed_, limit);
+        } catch (const RotationBlocked &) {
+          return std::nullopt;
+        }
+      };
+    if (!stalled) {
+      if (auto command = checked_command(error, path_turn_.escape() ? 0.07 : tolerance)) {
+        if (!continuing && command->twist.angular.z != 0.) {
+          path_turn_.start(heading, yaw, now, error);
+        }
+        return command;
+      }
+      // A direction rejected by geometry did not get a chance to move.
+      // Re-evaluate both sides when fresh observations arrive.
+      path_turn_.reset();
+    }
+    if (!path_turn_.alternative()) {
+      const double alternate = PathAlignmentTurn::other_side(shortest_error, error);
+      if (auto command = checked_command(alternate, std::min(0.07, tolerance))) {
+        if (command->twist.angular.z != 0.) {
+          path_turn_.start(heading, yaw, now, alternate, true);
+        }
+        RCLCPP_INFO_THROTTLE(logger_, *clock_, 2000,
+          "Path alignment: %s, switching to the checked %s turn",
+          stalled ? "no measured yaw progress" : "preferred turn blocked",
+          alternate < 0. ? "right" : "left");
+        return command;
+      }
+    }
+    return std::nullopt;
+  }
+
   std::pair<geometry_msgs::msg::PoseStamped, geometry_msgs::msg::PoseStamped> sampled_path(
     const geometry_msgs::msg::PoseStamped & pose, const rclcpp::Time & now)
   {
@@ -379,8 +455,8 @@ private:
       std::make_pair(execution_.half_length, execution_.half_width) :
       footprint_half_extents(costmap_ros_->getRobotFootprint());
     const auto limits = clearance_limits(obstacles_, footprint.first, footprint.second);
-    const double vx = std::min(approach_speed_, limits.linear);
-    const double wz = position_approach_yaw_rate(
+    double vx = std::min(approach_speed_, limits.linear);
+    double wz = position_approach_yaw_rate(
       bearing, distance, tolerance, vx, std::min(rotate_to_heading_angular_vel_, limits.angular));
     if (std::abs(error) > angular_dist_threshold_ ||
       approach_arc_miss(bearing, distance, vx, wz) > .9 * tolerance)
@@ -393,14 +469,33 @@ private:
         return std::nullopt;
       }
     }
-    if (!execution_.allows(vx, 0.0, wz)) {return std::nullopt;}
     // At the last few centimetres, DWB's full trajectory horizon can favour
     // sub-gait forward samples plus turning forever. Approach position with a
     // usable gait command, ignoring the requested final orientation entirely.
+    const auto approach_clear = [&]() {
+        const double arc_duration = std::abs(wz) < 1.e-6 ? distance / vx : 2. * std::abs(error / wz);
+        const double duration = std::min(1.5, std::max(distance / vx, arc_duration));
+        return execution_.allows(vx, 0., wz) && walking_arc_clear(pose, vx, wz, duration);
+      };
+    if (!approach_clear()) {
+      if (!execution_.enabled || vx <= execution_.minimum_translation) {return std::nullopt;}
+      // At a slower gait the command may pass without triggering a safety
+      // reduction below the walking floor. Preserve its checked curvature.
+      wz *= execution_.minimum_translation / vx;
+      vx = execution_.minimum_translation;
+      if (!approach_clear()) {return std::nullopt;}
+    }
     geometry_msgs::msg::TwistStamped command;
     command.header = pose.header;
-    const double arc_duration = std::abs(wz) < 1.e-6 ? distance/vx : 2.*std::abs(error/wz);
-    const double duration = std::min(1.5, std::max(distance/vx, arc_duration));
+    command.twist.linear.x = vx;
+    command.twist.angular.z = wz;
+    return command;
+  }
+
+  bool walking_arc_clear(
+    const geometry_msgs::msg::PoseStamped & pose, double vx, double wz, double duration)
+  {
+    const double yaw = tf2::getYaw(pose.pose.orientation);
     const int steps = std::max(1, static_cast<int>(std::ceil(duration/.025)));
     for (int i = 0; i <= steps; ++i) {
       const double t = duration*i/steps;
@@ -411,23 +506,23 @@ private:
         pose.pose.position.y+std::sin(yaw)*dx+std::cos(yaw)*dy,
         yaw+wz*t, costmap_ros_->getRobotFootprint());
       if (cost < 0.0 || cost >= nav2_costmap_2d::LETHAL_OBSTACLE) {
-        return std::nullopt;
+        return false;
       }
     }
-    command.twist.linear.x = vx;
-    command.twist.angular.z = wz;
-    return command;
+    return true;
   }
 
   geometry_msgs::msg::TwistStamped rotate(
     double error, double tolerance, double maximum,
-    const geometry_msgs::msg::PoseStamped & pose, double minimum)
+    const geometry_msgs::msg::PoseStamped & pose, double minimum,
+    std::optional<double> checked_limit = std::nullopt)
   {
     geometry_msgs::msg::TwistStamped command;
     command.header = pose.header;
     const double previous = std::isfinite(last_angular_vel_) &&
       std::abs(last_angular_vel_) <= rotate_to_heading_angular_vel_ ? last_angular_vel_ : 0.0;
-    const double checked_maximum=checked_rotation_limit(error,maximum,minimum,pose);
+    const double checked_maximum = checked_limit ? *checked_limit :
+      checked_rotation_limit(error, maximum, minimum, pose);
     if(checked_maximum<=0.)throw RotationBlocked();
     command.twist.angular.z = rotation_velocity(
       error, tolerance, previous, checked_maximum, minimum, rotation_gain_,
@@ -447,6 +542,7 @@ private:
   }
 
   RearTurnDirection direction_;
+  PathAlignmentTurn path_turn_;
   GoalCapture goal_capture_;
   geometry_msgs::msg::PoseStamped last_goal_;
   bool have_goal_{false};

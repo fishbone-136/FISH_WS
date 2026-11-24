@@ -19,6 +19,34 @@ from process_supervisor import ManagedChildren, process_identity
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def retained_command_helpers(owner_pid, candidates, proc_root=Path('/proc')):
+    """Retain exactly one known base/stand helper directly owned by this launch.
+
+    The conflict detector also recognizes command bridges now. A Nav2-only
+    reload must retain its own helpers without hiding another session's nodes.
+    """
+    expected = {
+        (ROOT/'ros2_ws/install/go2_core/lib/go2_core/go2_base').resolve(): 'base',
+        (ROOT/'ros2_ws/install/go2_lio_navigation/lib/go2_lio_navigation/idle_stand_guard.py').resolve(): 'stand',
+    }
+    matches = {'base': [], 'stand': []}
+    for pid in candidates:
+        try:
+            process = proc_root/str(pid)
+            fields = (process/'stat').read_text().rsplit(')', 1)[1].split()
+            if fields[0] == 'Z' or int(fields[1]) != owner_pid:
+                continue
+            argv = [v.decode() for v in (process/'cmdline').read_bytes().split(b'\0') if v]
+            for value in argv[:2]:
+                role = expected.get(Path(value).resolve())
+                if role:
+                    matches[role].append(pid)
+                    break
+        except (OSError, ValueError, IndexError, UnicodeError):
+            continue
+    return {pids[0] for pids in matches.values() if len(pids) == 1}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--main-pid', type=int, required=True)
@@ -108,7 +136,12 @@ def main():
     yaw_limit = nav_config['controller_server']['ros__parameters']['FollowPath']['max_vel_theta']
     expected_speed = nav_config['controller_server']['ros__parameters']['FollowPath']['max_vel_x']
     expected_tolerance=nav_config['controller_server']['ros__parameters']['goal_checker']['xy_goal_tolerance']
-    conflicts = set(conflicting_navigation_processes())-{args.container_pid, args.gate_pid}
+    candidates = set(conflicting_navigation_processes())
+    targets = {args.container_pid, args.gate_pid}
+    if args.base_pid is not None:
+        targets.add(args.base_pid)  # Identity was checked above.
+    retained_helpers = retained_command_helpers(args.main_pid, candidates-targets)
+    conflicts = candidates-targets-retained_helpers
     if conflicts:
         raise RuntimeError(f'Other navigation/gate processes still running: {sorted(conflicts)}')
     managed = ManagedChildren(args.main_pid)
@@ -133,6 +166,7 @@ def main():
     node = rclpy.create_node('navigation_reload_supervisor')
     state = {'statuses': [], 'velocity_samples': 0}
     report = {'owner_pid': args.main_pid, 'supervisor_pid': os.getpid(), 'applied': False}
+    report['retained_helper_pids'] = sorted(retained_helpers)
     logs = []
     report_path = ROOT/'reports'/f'{args.report_prefix}.json'
 
@@ -273,11 +307,12 @@ def main():
             raise RuntimeError('Collision-monitor startup failed')
         gate = start(gate_args, 'gate')
         report['gate_pid'] = gate.pid
+        sensor_x = parameters('scan_safety_gate', ['raw_sensor_x'])[0].double_value
         started = time.monotonic()
         nav = start(['/usr/bin/python3', '/opt/ros/humble/bin/ros2', 'launch', 'go2_navigation',
                      'go2_nav2.launch.py', 'mapping_mode:=true', 'lio_mode:=true',
                      'terrain_mode:=indoor', 'controller_mode:=dwb', 'use_composition:=true',
-                     'log_level:=warn'], 'nav2')
+                     f'sensor_x:={sensor_x}', 'log_level:=warn'], 'nav2')
         report['nav2_launch_pid'] = nav.pid
         write()
         deadline = time.monotonic()+45
@@ -313,9 +348,17 @@ def main():
             actual = parameters(name, ['footprint_padding', 'inflation_layer.inflation_radius',
                                        'footprint'])
             expected = nav_config[name.split('/')[0]][name.split('/')[1]]['ros__parameters']
-            if (actual[0].double_value != expected['footprint_padding'] or
+            expected_footprint = yaml.safe_load(expected['footprint'])
+            expected_padding = expected['footprint_padding']
+            if name.startswith('global_costmap/'):
+                # The LIO launch uses the physical inscribed radius for Smac2D.
+                front, rear, half_width = geometry
+                expected_footprint = [[front, half_width], [front, -half_width],
+                                      [-rear, -half_width], [-rear, half_width]]
+                expected_padding = 0.0
+            if (actual[0].double_value != expected_padding or
                     actual[1].double_value != expected['inflation_layer']['inflation_radius'] or
-                    yaml.safe_load(actual[2].string_value) != yaml.safe_load(expected['footprint'])):
+                    yaml.safe_load(actual[2].string_value) != expected_footprint):
                 raise RuntimeError('Costmap protection parameters did not apply: '+name)
             report['costmap_geometry'][name] = [v.double_value for v in actual[:2]]
         body_topic = parameters('collision_monitor', ['FootprintApproach.footprint_topic'])[0].string_value

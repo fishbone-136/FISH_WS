@@ -3,16 +3,21 @@ from launch.actions import DeclareLaunchArgument
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 
 
 def generate_launch_description():
     return LaunchDescription([
+        DeclareLaunchArgument('use_sim_time', default_value='false'),
         DeclareLaunchArgument('cloud_topic', default_value='/livox/lidar'),
         DeclareLaunchArgument('accumulated_cloud_topic', default_value='/trans_cloud'),
         DeclareLaunchArgument('scan_topic', default_value='/scan'),
         DeclareLaunchArgument('obstacle_points_topic', default_value='/obstacle_points'),
         DeclareLaunchArgument('ground_plane_topic', default_value='/perception/ground_plane'),
         DeclareLaunchArgument('ground_pose_topic',default_value=''),
+        DeclareLaunchArgument('scan_mirror_topic', default_value=''),
+        DeclareLaunchArgument('obstacle_mirror_topic', default_value=''),
+        DeclareLaunchArgument('ground_mirror_topic', default_value=''),
         DeclareLaunchArgument('projection_node_name', default_value='pointcloud_to_laserscan_node'),
         DeclareLaunchArgument('scan_period', default_value='0.0666666667'),
         DeclareLaunchArgument('target_frame', default_value='base_link'),
@@ -38,6 +43,7 @@ def generate_launch_description():
             'projection_cloud_topic',
             default_value=LaunchConfiguration('accumulated_cloud_topic')),
         DeclareLaunchArgument('ground_filter_enabled', default_value='false'),
+        DeclareLaunchArgument('require_ground_for_scan', default_value='false'),
         DeclareLaunchArgument('observed_free_space_only', default_value='false'),
         Node(
             package='go2_perception',
@@ -48,6 +54,7 @@ def generate_launch_description():
                 ('cloud', LaunchConfiguration('accumulated_cloud_topic')),
             ],
             parameters=[{
+                'use_sim_time': LaunchConfiguration('use_sim_time'),
                 'accumulation_frames': LaunchConfiguration('accumulation_frames'),
                 'min_height': LaunchConfiguration('cloud_min_height'),
                 'max_height': LaunchConfiguration('cloud_max_height'),
@@ -70,6 +77,13 @@ def generate_launch_description():
                 ('ground_plane',LaunchConfiguration('ground_plane_topic')),
             ],
             parameters=[{
+                'use_sim_time': LaunchConfiguration('use_sim_time'),
+                'scan_mirror_topic': ParameterValue(
+                    LaunchConfiguration('scan_mirror_topic'), value_type=str),
+                'obstacle_mirror_topic': ParameterValue(
+                    LaunchConfiguration('obstacle_mirror_topic'), value_type=str),
+                'ground_mirror_topic': ParameterValue(
+                    LaunchConfiguration('ground_mirror_topic'), value_type=str),
                 'target_frame': LaunchConfiguration('target_frame'),
                 'scan_frame': LaunchConfiguration('scan_frame'),
                 'level_scan': LaunchConfiguration('level_scan'),
@@ -84,6 +98,7 @@ def generate_launch_description():
                 'min_height': LaunchConfiguration('scan_min_height'),
                 'max_height': LaunchConfiguration('scan_max_height'),
                 'ground_filter_enabled': LaunchConfiguration('ground_filter_enabled'),
+                'require_ground_for_scan': LaunchConfiguration('require_ground_for_scan'),
                 'ground_pose_topic': LaunchConfiguration('ground_pose_topic'),
                 'observed_free_space_only': LaunchConfiguration('observed_free_space_only'),
                 'ground_clearance': 0.10,
@@ -92,7 +107,7 @@ def generate_launch_description():
                 'angle_max': 3.14,
                 'angle_increment': 0.00698,
                 'scan_time': LaunchConfiguration('scan_period'),
-                'range_min': 0.25,
+                'range_min': 0.05,
                 # Match the Nav2 raytrace envelope. Longer points only clutter
                 # RViz and cannot enter the 10 m rolling local costmap.
                 'range_max': LaunchConfiguration('cloud_max_range'),

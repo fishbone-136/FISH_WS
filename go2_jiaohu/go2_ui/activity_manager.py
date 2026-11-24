@@ -13,7 +13,7 @@ from typing import Callable
 
 
 StartCallback = Callable[[], bool | None]
-StopCallback = Callable[[], None]
+StopCallback = Callable[[], bool | None]
 
 
 @dataclass(frozen=True)
@@ -59,7 +59,8 @@ class ExclusiveActivityManager:
 
         self._switching = True
         try:
-            self.deactivate()
+            if self.deactivate() is False:
+                return False
             try:
                 started = self._activities[name].start()
             except Exception:
@@ -83,11 +84,14 @@ class ExclusiveActivityManager:
             return False
         return self.activate(name)
 
-    def deactivate(self) -> None:
+    def deactivate(self) -> bool:
         active = self._active
         if active is None:
-            return
+            return True
         # Clear first so callbacks cannot observe stale ownership or restart
         # the same feature through a nested signal.
         self._active = None
-        self._activities[active].stop()
+        if self._activities[active].stop() is False:
+            self._active = active
+            return False
+        return True

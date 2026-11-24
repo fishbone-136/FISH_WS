@@ -39,3 +39,13 @@ def bound_sparse_command(requested, previous):
             bounded.append(current)
             ratio = min(ratio, abs(old/current))
     return tuple(ratio*x for x in bounded)
+
+
+def lidar_blind_outline(radius=.5, fov_degrees=120., steps=32):
+    """Outline the manufacturer-rated blind sector; this is not an obstacle."""
+    if not (math.isfinite(radius) and radius>0. and math.isfinite(fov_degrees)
+            and 0.<fov_degrees<=360. and isinstance(steps,int) and steps>=2):
+        raise ValueError('Invalid blind-zone outline')
+    half=math.radians(fov_degrees)/2.
+    return [(0.,0.)]+[(radius*math.cos(-half+2*half*i/steps),
+                       radius*math.sin(-half+2*half*i/steps)) for i in range(steps+1)]+[(0.,0.)]

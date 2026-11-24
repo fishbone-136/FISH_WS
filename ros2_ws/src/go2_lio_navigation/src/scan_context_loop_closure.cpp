@@ -172,6 +172,8 @@ public:
       1, static_cast<int>(declare_parameter<int>("source_submap_keyframes", 3)));
     min_loop_time_ = declare_parameter<double>("min_loop_time", 10.0);
     min_loop_travel_ = declare_parameter<double>("min_loop_travel", 2.0);
+    turn_revisits_ = declare_parameter<bool>("turn_revisits", false);
+    sensor_forward_offset_ = declare_parameter<double>("sensor_forward_offset", 0.0);
     loop_search_radius_ = declare_parameter<double>("loop_search_radius", 5.0);
     gicp_max_correspondence_ = declare_parameter<double>(
       "gicp_max_correspondence_distance", 1.5);
@@ -240,6 +242,8 @@ public:
   }
 
 private:
+  static constexpr std::size_t turn_keyframe_exclusion = 6;
+
   struct Keyframe
   {
     rclcpp::Time stamp;
@@ -248,6 +252,9 @@ private:
     Eigen::MatrixXf descriptor;
     Eigen::VectorXf ring_key;
     double travel{0.0};
+    double heading{0.0};
+    double angular_travel{0.0};
+    Eigen::Vector3d body_center{Eigen::Vector3d::Zero()};
   };
 
   struct Candidate
@@ -255,6 +262,7 @@ private:
     std::size_t index{0};
     float distance{std::numeric_limits<float>::infinity()};
     int sector_shift{0};
+    bool turn_revisit{false};
   };
 
   struct Registration
@@ -344,10 +352,43 @@ private:
     return descriptor.rowwise().mean();
   }
 
+  std::vector<Candidate> find_turn_candidates(const Keyframe & current) const
+  {
+    // A nearby view can recur after either a full turn or a sweep back toward
+    // the original heading. Require substantial rotation, a short body path,
+    // and independent keyframes, even when the lidar itself describes an arc.
+    constexpr double min_angular_travel = 110.0 * M_PI / 180.0;
+    constexpr double heading_tolerance = 25.0 * M_PI / 180.0;
+    std::vector<Candidate> candidates;
+    const std::size_t current_index = keyframes_.size() - 1;
+    for (std::size_t index = 0; index + turn_keyframe_exclusion <= current_index; ++index) {
+      const auto & previous = keyframes_[index];
+      const double elapsed = (current.stamp - previous.stamp).seconds();
+      const double heading = std::abs(std::remainder(current.heading - previous.heading, 2.0 * M_PI));
+      const double distance = (current.body_center - previous.body_center).head<2>().norm();
+      if (elapsed >= 3.0 && elapsed <= 90.0 && heading <= heading_tolerance &&
+        current.angular_travel - previous.angular_travel >= min_angular_travel &&
+        current.travel - previous.travel <= 0.90 && distance <= 0.40)
+      {
+        const float score = static_cast<float>(heading / heading_tolerance + distance / 0.40);
+        candidates.push_back({index, score, 0, true});
+      }
+    }
+    const auto by_score = [](const Candidate & a, const Candidate & b) {
+        return a.distance < b.distance;
+      };
+    const auto count = std::min<std::size_t>(
+      std::min(2, max_registration_candidates_), candidates.size());
+    std::partial_sort(candidates.begin(), candidates.begin() + count, candidates.end(), by_score);
+    candidates.resize(count);
+    return candidates;
+  }
+
   std::vector<Candidate> find_candidates(const Keyframe & current) const
   {
+    auto turn_candidates = turn_revisits_ ? find_turn_candidates(current) : std::vector<Candidate>{};
     if (keyframes_.size() <= static_cast<std::size_t>(recent_exclusion_)) {
-      return {};
+      return turn_candidates;
     }
     const std::size_t current_index = keyframes_.size() - 1;
     const Eigen::Isometry3d current_pose = gtsam_to_eigen(
@@ -391,15 +432,24 @@ private:
     std::sort(candidates.begin(), candidates.end(), [](const Candidate & a, const Candidate & b) {
       return a.distance < b.distance;
     });
-    if (candidates.size() > static_cast<std::size_t>(max_registration_candidates_)) {
-      candidates.resize(max_registration_candidates_);
+    for (const auto & candidate : candidates) {
+      if (std::none_of(turn_candidates.begin(), turn_candidates.end(), [&](const auto & existing) {
+          return existing.index == candidate.index;
+        }))
+      {
+        turn_candidates.push_back(candidate);
+      }
     }
-    return candidates;
+    if (turn_candidates.size() > static_cast<std::size_t>(max_registration_candidates_)) {
+      turn_candidates.resize(max_registration_candidates_);
+    }
+    return turn_candidates;
   }
 
   std::optional<Registration> verify_loop(
-    std::size_t candidate_index, std::size_t current_index, int sector_shift)
+    const Candidate & candidate, std::size_t current_index)
   {
+    const auto candidate_index = candidate.index;
     const Eigen::Isometry3d candidate_pose = gtsam_to_eigen(
       estimate_.at<gtsam::Pose3>(X(candidate_index)));
     const Eigen::Isometry3d current_pose = gtsam_to_eigen(
@@ -409,8 +459,10 @@ private:
     const std::size_t begin = candidate_index > static_cast<std::size_t>(submap_half_window_) ?
       candidate_index - static_cast<std::size_t>(submap_half_window_) : 0;
     // Never allow the current/recent source scans to verify themselves.
+    const auto exclusion = candidate.turn_revisit ?
+      turn_keyframe_exclusion : static_cast<std::size_t>(recent_exclusion_);
     const std::size_t end = std::min(
-      current_index - static_cast<std::size_t>(recent_exclusion_),
+      current_index - exclusion,
       candidate_index + static_cast<std::size_t>(submap_half_window_));
     for (std::size_t index = begin; index <= end; ++index) {
       const Eigen::Isometry3d neighbor = gtsam_to_eigen(estimate_.at<gtsam::Pose3>(X(index)));
@@ -433,13 +485,23 @@ private:
     voxel.filter(*filtered_target);
     voxel.setInputCloud(source);
     voxel.filter(*filtered_source);
+    const Eigen::Isometry3d prediction = candidate_inverse * current_pose;
+    auto options = registration_options_;
+    int sector_shift = candidate.sector_shift;
+    if (candidate.turn_revisit) {
+      // A familiar heading gives a local seed. Keep the original acceptance
+      // tests and avoid searching for a different wall farther away.
+      options.correspondence_distance = std::min(options.correspondence_distance, 0.45);
+      const double heading = std::atan2(prediction.linear()(1, 0), prediction.linear()(0, 0));
+      sector_shift = static_cast<int>(std::lround(heading * sectors_ / (2.0 * M_PI)));
+    }
     const auto result = loop::register_clouds(
-      filtered_source, filtered_target, candidate_inverse * current_pose,
-      sector_shift, sectors_, registration_options_);
+      filtered_source, filtered_target, prediction, sector_shift, sectors_, options);
     if (!result.accepted) {
       publish_status(
         "loop_rejected current=" + std::to_string(current_index) +
-        " candidate=" + std::to_string(candidate_index) + " reason=" + result.reason +
+        " candidate=" + std::to_string(candidate_index) +
+        (candidate.turn_revisit ? " type=turn" : " type=translation") + " reason=" + result.reason +
         " overlap=" + std::to_string(result.overlap) +
         " normal_ratio=" + std::to_string(result.normal_eigenvalue_ratio));
       return std::nullopt;
@@ -517,6 +579,14 @@ private:
   {
     const rclcpp::Time stamp(odometry->header.stamp);
     const Eigen::Isometry3d raw_pose = pose_to_eigen(odometry->pose.pose);
+    const double heading = std::atan2(raw_pose.linear()(1, 0), raw_pose.linear()(0, 0));
+    if (turn_revisits_ && stamp > heading_stamp_) {
+      if (heading_stamp_.nanoseconds() != 0) {
+        angular_travel_ += std::abs(std::remainder(heading - last_heading_, 2.0 * M_PI));
+      }
+      last_heading_ = heading;
+      heading_stamp_ = stamp;
+    }
     if (!should_make_keyframe(stamp, raw_pose)) {
       return;
     }
@@ -530,9 +600,13 @@ private:
     Keyframe keyframe;
     keyframe.stamp = stamp;
     keyframe.raw_pose = raw_pose;
+    keyframe.heading = heading;
+    keyframe.angular_travel = angular_travel_;
+    keyframe.body_center = raw_pose * Eigen::Vector3d(-sensor_forward_offset_, 0.0, 0.0);
     if (!keyframes_.empty()) {
-      keyframe.travel = keyframes_.back().travel +
-        (raw_pose.translation() - keyframes_.back().raw_pose.translation()).norm();
+      const auto & previous = keyframes_.back();
+      const Eigen::Vector3d increment = keyframe.body_center - previous.body_center;
+      keyframe.travel = previous.travel + (turn_revisits_ ? increment.head<2>().norm() : increment.norm());
     }
     keyframe.scan = std::move(scan);
     keyframe.descriptor = make_descriptor(*keyframe.scan);
@@ -551,8 +625,7 @@ private:
           " candidates=0 loops=" + std::to_string(accepted_loops_));
       }
       for (const auto & candidate : candidates) {
-        const auto registration = verify_loop(
-          candidate.index, current_index, candidate.sector_shift);
+        const auto registration = verify_loop(candidate, current_index);
         if (registration) {
           const Eigen::Isometry3d predicted = gtsam_to_eigen(
             estimate_.at<gtsam::Pose3>(X(candidate.index))).inverse() *
@@ -566,14 +639,15 @@ private:
           publish_status(
             "loop_accepted current=" + std::to_string(current_index) +
             " candidate=" + std::to_string(candidate.index) +
-            " descriptor=" + std::to_string(candidate.distance) +
+            (candidate.turn_revisit ? " type=turn" : " type=translation") +
+            (candidate.turn_revisit ? " seed_score=" : " descriptor=") + std::to_string(candidate.distance) +
             " rmse=" + std::to_string(std::sqrt(registration->fitness)) +
             " overlap=" + std::to_string(registration->overlap) +
             " correction_m=" + std::to_string(correction));
           RCLCPP_INFO(
             get_logger(),
-            "Loop %zu <-> %zu accepted: descriptor %.3f, RMSE %.3f m, overlap %.0f%%, correction %.3f m",
-            current_index, candidate.index, candidate.distance,
+            "%s loop %zu <-> %zu accepted: score %.3f, RMSE %.3f m, overlap %.0f%%, correction %.3f m",
+            candidate.turn_revisit ? "Turn" : "Translation", current_index, candidate.index, candidate.distance,
             std::sqrt(registration->fitness), registration->overlap * 100.0, correction);
           break;
         }
@@ -689,6 +763,11 @@ private:
   int source_submap_keyframes_{3};
   double min_loop_time_{10.0};
   double min_loop_travel_{2.0};
+  bool turn_revisits_{false};
+  double sensor_forward_offset_{0.0};
+  double last_heading_{0.0};
+  double angular_travel_{0.0};
+  rclcpp::Time heading_stamp_{0, 0, RCL_ROS_TIME};
   double loop_search_radius_{5.0};
   loop::Options registration_options_;
   double gicp_max_correspondence_{1.5};

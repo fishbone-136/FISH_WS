@@ -85,10 +85,23 @@ class _SdkProcessBridge:
         return self._send_payload({'command': 'visual_velocity', 'vx': float(vx),
             'wz': float(wz), 'issued_at': time.monotonic(), 'lease': .25})
 
+    def send_follow_velocity(self, vx: float, wz: float) -> bool:
+        return self._send_payload({'command': 'follow_velocity', 'vx': float(vx),
+            'wz': float(wz), 'issued_at': time.monotonic(), 'lease': .25})
+
     def _send_payload(self, payload) -> bool:
+        return self._request_payload(payload) is not None
+
+    def read_sport_state(self) -> dict:
+        response = self._request_payload({'command': 'read_sport_state'})
+        if response is None:
+            raise ValueError(self.error)
+        return response['state']
+
+    def _request_payload(self, payload):
         if not self.ready or self._process is None or self._process.stdin is None:
             self.error = self.error or "Unitree SDK2 运动桥不可用"
-            return False
+            return None
         with self._lock:
             self._request_counter += 1
             request_id = f"{os.getpid()}-{time.monotonic_ns()}-{self._request_counter}"
@@ -108,13 +121,13 @@ class _SdkProcessBridge:
                         continue
                     if response.get("status") == "accepted":
                         self.error = ""
-                        return True
+                        return response
                     self.error = str(response.get("error", "Unitree SDK2 拒绝动作"))
-                    return False
+                    return None
                 self.error = "等待 Unitree SDK2 动作回执超时"
             except (BrokenPipeError, OSError, RuntimeError, TimeoutError) as exc:
                 self.error = str(exc)
-            return False
+            return None
 
     def _read_response(self, timeout: float) -> dict:
         if self._process is None or self._process.stdout is None:
@@ -368,6 +381,17 @@ class Go2RobotController:
         if self.backend != 'sdk' or self._bridge is None or not self._bridge.ready:
             return False
         return self._bridge.send_visual_velocity(vx, wz)
+
+    def read_sport_state(self) -> dict:
+        """Read stance through the isolated SDK process, without ROS nodes."""
+        if self.backend != 'sdk' or self._bridge is None or not self._bridge.ready:
+            raise ValueError('SDK 运动桥未连接')
+        return self._bridge.read_sport_state()
+
+    def send_follow_velocity(self, vx: float, wz: float) -> bool:
+        if self.backend != 'sdk' or self._bridge is None or not self._bridge.ready:
+            return False
+        return self._bridge.send_follow_velocity(vx, wz)
 
     def shutdown(self) -> None:
         if self._bridge is not None:

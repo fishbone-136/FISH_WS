@@ -1,10 +1,12 @@
 <!--
   Replan at 2 Hz. Wait briefly on failure instead of clearing a real obstacle
-  out of the costmap. Unreachable routes fail after bounded retries.
+  out of the costmap. Keep the goal through up to 10 recovery waits
+  so a person crossing/occupying the goal briefly does not abandon navigation.
+  Persistent failures still terminate; cancel and new goals remain interruptible.
 -->
 <root main_tree_to_execute="MainTree">
   <BehaviorTree ID="MainTree">
-    <RecoveryNode number_of_retries="2" name="NavigateRecovery">
+    <RecoveryNode number_of_retries="10" name="NavigateRecovery">
       <PipelineSequence name="NavigateWithReplanning">
         <RateController hz="2.0">
           <Sequence>

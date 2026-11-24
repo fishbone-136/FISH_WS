@@ -22,7 +22,8 @@ def test_input_timestamp_sets_deadline_instead_of_extending_a_delayed_command():
     assert deadline == 100.25
 
 
-def test_worker_expires_velocity_lease_when_perception_stops(monkeypatch):
+@pytest.mark.parametrize('command',['visual_velocity','follow_velocity'])
+def test_worker_expires_velocity_lease_when_perception_stops(monkeypatch, command):
     calls, statuses = [], []
     client = type('Client',(),{'Move':lambda self,*v:calls.append(v) or 0,
         'StopMove':lambda self:calls.append('stop') or 0})()
@@ -33,7 +34,7 @@ def test_worker_expires_velocity_lease_when_perception_stops(monkeypatch):
         thread = threading.Thread(target=sdk_worker._run_command_loop,args=(client,stream))
         thread.start()
         try:
-            os.write(write_fd,(json.dumps(dict(command='visual_velocity',vx=.1,wz=.1,
+            os.write(write_fd,(json.dumps(dict(command=command,vx=.1,wz=.1,
                 issued_at=time.monotonic(),lease=.15,request_id='lease'))+'\n').encode())
             deadline=time.monotonic()+1.
             while 'stop' not in calls and time.monotonic()<deadline:
@@ -45,3 +46,18 @@ def test_worker_expires_velocity_lease_when_perception_stops(monkeypatch):
             os.close(write_fd)
             thread.join(timeout=2.)
         assert not thread.is_alive()
+
+
+def test_follow_lease_accepts_rotation_at_zero_forward_speed(monkeypatch):
+    monkeypatch.setattr(config,'MAX_TURN_SPEED',.65)
+    motion,deadline = sdk_worker._follow_velocity_spec(
+        dict(vx=0.,wz=.5,issued_at=100.,lease=.25),100.1)
+    assert motion == (0.,0.,.5)
+    assert deadline == 100.25
+
+
+@pytest.mark.parametrize('changes',[dict(vx=-.1),dict(vx=.41),dict(wz=.51),dict(lease=.5),
+                                   dict(issued_at=99.),dict(wz=float('nan'))])
+def test_follow_speed_and_timestamp_limits(changes):
+    with pytest.raises(ValueError):
+        sdk_worker._follow_velocity_spec({**dict(vx=.2,wz=.3,issued_at=100.,lease=.25),**changes},100.)

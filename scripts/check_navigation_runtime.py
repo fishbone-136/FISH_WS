@@ -55,6 +55,7 @@ def main():
                         help='Subscribe to optional 3D visualization outputs (adds serialization load)')
     parser.add_argument('--light',action='store_true',
                         help='Sample motion/freshness only, avoiding map and raw-cloud probe load')
+    parser.add_argument('--lidar-source', choices=('unitree', 'hap'), default='unitree')
     args = parser.parse_args()
     if not 3 <= args.seconds <= 120:
         parser.error('--seconds must be between 3 and 120')
@@ -96,11 +97,18 @@ def main():
             stamps[topic].append(stamp.sec+stamp.nanosec/1.e9)
             age = (node.get_clock().now().nanoseconds / 1.e9 -
                    stamp.sec - stamp.nanosec / 1.e9)
-            ages[topic].append(age * 1000)
+            if not topic.startswith('/utlidar/'):
+                ages[topic].append(age * 1000)
 
-    topics = [
-        ('/livox/lidar', PointCloud2, False),
-        ('/livox/imu', Imu, False), ('/cloud_registered_body', PointCloud2, False),
+    if args.lidar_source == 'unitree':
+        topics = [('/utlidar/cloud', PointCloud2, False),
+                  ('/utlidar/robot_odom', Odometry, False),
+                  ('/unitree/navigation_source/valid', Bool, True),
+                  ('/unitree/navigation_source/status', String, True)]
+    else:
+        topics = [('/livox/lidar', PointCloud2, False), ('/livox/imu', Imu, False)]
+    topics += [
+        ('/cloud_registered_body', PointCloud2, False),
         ('/obstacles/deskewed', PointCloud2, False),
         ('/Odometry', Odometry, False), ('/odom', Odometry, False),
         ('/scan', LaserScan, False), ('/scan_safety', LaserScan, False),
@@ -144,8 +152,9 @@ def main():
     for name, parameters in [
         ('environment_mapper', ['update_rate', 'cloud_publish_rate']),
         ('traversability_mapper', ['update_rate']),
-        ('livox_lidar_publisher', ['publish_freq']),
-        ('laser_mapping', ['preprocess.scan_rate']),
+        *(([('unitree_navigation_source', ['world_frame', 'planar_frame'])])
+          if args.lidar_source == 'unitree' else
+          [('livox_lidar_publisher', ['publish_freq']), ('laser_mapping', ['preprocess.scan_rate'])]),
         ('velocity_smoother', ['smoothing_frequency', 'max_velocity']),
         ('global_costmap/global_costmap', ['update_frequency', 'publish_frequency',
              'static_layer.map_topic','inflation_layer.inflation_radius','footprint_padding']),
@@ -217,6 +226,8 @@ def main():
         rate = (len(samples)-1) / (samples[-1]-samples[0]) if len(samples) > 1 else None
         item = dict(messages=len(samples), hz=round(rate, 2) if rate is not None else None,
                     publishers=node.count_publishers(topic))
+        if topic.startswith('/utlidar/'):
+            item['timestamp_domain'] = 'device'
         if ages[topic]:
             item.update(age_ms_median=round(float(np.median(ages[topic])), 1),
                         age_ms_p95=round(float(np.percentile(ages[topic], 95)), 1))

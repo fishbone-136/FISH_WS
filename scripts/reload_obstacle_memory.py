@@ -319,7 +319,7 @@ def main():
                 raise RuntimeError('Replacement LIO bridge exited')
             m=state.get('memory',{})
             report['replacement_last_status']=m
-            healthy=(m.get('clearing_policy')=='motion_evidence_v7_near_volume' and
+            healthy=(m.get('clearing_policy')=='motion_evidence_v11_moving_priority' and
                 m.get('clearing_transport')=='numeric_delta_v1' and
                 (not args.preserve_session_memory or m.get('checkpoint_restored')) and
                 (not args.reset_session_memory or not m.get('checkpoint_restored')) and

@@ -15,21 +15,21 @@
 导航已集成到原 Qt 底栏的“导航”页，支持在线建图、载入地图定位、地图显示、
 点击选点、初始位姿、目标发送/取消、代价地图清理、地图保存与急停。
 
-导航激光雷达现已切换为外接 **Livox HAP**：启动建图或定位时会自动启动
-`livox_ros_driver2`，使用 `/livox/lidar` 生成 `/scan`，并发布已标定的
-`base_link -> livox_frame` 静态 TF。`/odom` 使用 `/lf/sportmodestate`，默认导航链
-不再订阅 Go2 自带 UTLidar 的任何 `/utlidar/*` 话题。
+导航页、2.5D 导航、二维建图和已有地图定位默认使用 **Go2 本体雷达**。
+实时 2.5D 地图和避障使用 `/utlidar/cloud` 与 `/utlidar/cloud_base`，
+并用 `/utlidar/robot_odom` 对点云去畸变和提供导航位姿。
+二维入口使用同一套点云去畸变和地面投影，由 SLAM Toolbox 或 AMCL 提供地图定位。
+需要外接 HAP 时，构建使用 `bash scripts/build.sh --hap`，启动加 `lidar_source:=hap`。
 
-当前推荐入口为 HAP + FAST-LIO 的 LIO 导航。Nav2 默认使用稳定转向控制器与
-DWB，局部代价地图分辨率 4 cm、更新 15 Hz，全局分辨率 8 cm、更新 8 Hz，
-路径以 2 Hz 重规划；进入目标点 0.10 m 范围即可完成，不限制最终朝向。
+Nav2 默认使用稳定转向控制器与
+DWB，局部代价地图分辨率 4 cm、更新 20 Hz。LIO 全局代价地图分辨率 4 cm、更新 10 Hz。
+LIO 全局路径重规划设为 4 Hz。进入目标点 0.10 m 范围即可完成，最终朝向不限。
 局部轨迹选择包含步态与近障碍速度约束，并根据双侧墙体和机身姿态处理窄道，
 保留现有保护足迹及膨胀半径。传统二维建图、已有地图定位入口仍保留，
 导航页可选室内与室外参数。
 
-2D 导航 TF 使用 Go2 腿部/IMU 状态估计，并滤除四足步态产生的 roll/pitch/z 起伏；
-HAP 点云默认只使用最新一帧、历史限制为 0.12 秒，异常位姿跳变和乱序扫描会被拒绝，
-防止动态障碍拖影进入 SLAM。
+二维导航的底盘 TF 使用 Go2 腿部/IMU 状态估计。雷达逐点去畸变后生成水平扫描，
+只把有实测回波支持的区域交给建图及避障。
 
 命令行可直接选择地形配置：
 
@@ -38,23 +38,31 @@ ros2 launch go2_navigation go2_mapping.launch.py terrain_mode:=outdoor
 ros2 launch go2_navigation go2_mapping.launch.py terrain_mode:=indoor
 ```
 
-HAP 驱动已经由上述入口自动启动。若已在其他终端单独运行驱动，可加
-`start_hap_driver:=false`，避免重复占用雷达端口。
+HAP 模式会自动启动驱动。若已在其他终端运行驱动，可加 `start_hap_driver:=false`。
 
-请从 [Go2_Humble_使用教程.md](Go2_Humble_使用教程.md) 开始，并按 [本地资源说明](docs/LOCAL_RESOURCES.md) 补齐模型、GPU 运行库和 Livox underlay。常用入口：
+使用教程与本地依赖见 [Go2_Humble_使用教程.md](Go2_Humble_使用教程.md) 和 [本地资源说明](docs/LOCAL_RESOURCES.md)。常用入口如下。
 
 ```bash
 bash scripts/install_dependencies.sh
 cp go2_jiaohu/.env.example go2_jiaohu/.env
 bash scripts/build.sh
-# HAP + FAST-LIO2 + 在线可通行地图 + Nav2（必须通过该入口加载 Go2 DDS 网卡）
+# 本体雷达 + 在线可通行地图 + Nav2
 bash scripts/run_lio_navigation.sh
-# 语音/视觉动作默认使用隔离的 unitree_sdk2_python 进程直连 Go2
+# 预览本体雷达地图，关闭底盘命令桥和自主导航
+bash scripts/run_lio_navigation.sh enable_go2_base:=false enable_nav2:=false
+# 二维建图与已有二维地图定位
+bash scripts/run_mapping.sh
+bash scripts/run_navigation.sh /绝对路径/地图.yaml
+# 切回 HAP + FAST-LIO2，新开一个建图会话
+bash scripts/run_lio_navigation.sh lidar_source:=hap
+# 邦邦 UI 的“导航”页使用本体雷达启动 2.5D 导航，或接入已运行的导航
 bash scripts/run_ui.sh
 ```
 
 本机原始压缩包与历史工程副本未上传。请从 `.env.example` 创建不受 Git 跟踪的
-`go2_jiaohu/.env`，配置本机 Ollama/Qwen、Whisper、Go2 网卡和报警接入。语音
+`go2_jiaohu/.env`，配置本机 Ollama、Qwen ASR、Go2 网卡和报警接入。默认语音识别复用
+上级 `yuyin/.venv-qwen` 和 `Qwen3-ASR-0.6B`，无需改动 ROS/UI 环境；
+`GO2_ASR_BACKEND=whisper` 可切回旧识别器，详见 [交互说明](go2_jiaohu/README.md)。语音
 对话与控制均在本地运行，不再需要云端 API 密钥。
 
 语音/视觉动作默认通过 `unitree_sdk2_python` 的 `SportClient` 下发，并检查服务与 API

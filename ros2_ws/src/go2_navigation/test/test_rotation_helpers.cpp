@@ -66,6 +66,56 @@ TEST(RearTurn, RetainsTheCollisionCheckedAlternativeAcrossReplanning)
   EXPECT_GT(turn.error(3.13),0.);
 }
 
+TEST(PathAlignment, TriesRightForALeftBearingOutsideTheOldRearOnlyWindow)
+{
+  go2_navigation::PathAlignmentTurn turn;
+  const double heading = 2.45;
+  const double alternate = turn.other_side(heading, heading);
+  ASSERT_LT(alternate, -3.0);
+  turn.start(heading, 0., 10., alternate, true);
+  // Neither a fresh path nor crossing the +/-pi bearing wrap revives the
+  // old left turn while the checked right turn makes real progress.
+  for (int tick = 1; tick <= 24; ++tick) {
+    const double yaw = -.052 * tick;
+    const double replanned_heading = heading + (tick % 2 ? .04 : -.04);
+    const double error = std::remainder(replanned_heading - yaw, go2_navigation::full_turn);
+    turn.update(replanned_heading, yaw, 10. + .10 * tick);
+    ASSERT_TRUE(turn.alternative());
+    EXPECT_LT(turn.remaining(error, yaw), 0.);
+    EXPECT_FALSE(turn.stalled());
+  }
+  turn.update(heading - .6, -1.25, 12.5);
+  EXPECT_FALSE(turn.active());
+}
+
+TEST(PathAlignment, StationaryBodyAndOppositeJitterDoNotCountAsProgress)
+{
+  go2_navigation::PathAlignmentTurn turn;
+  turn.start(1.8, 0., 2., 1.8);
+  for (int i = 1; i <= 13; ++i) {
+    turn.update(1.8, i % 2 ? -.021 : .019, 2. + i * .1);
+  }
+  EXPECT_TRUE(turn.stalled());
+  EXPECT_LT(turn.other_side(1.8, 1.8), 0.);
+  turn.reset();
+  EXPECT_FALSE(turn.stalled());
+}
+
+TEST(PathAlignment, ForwardSideEscapeStopsAfterABoundedRightPivot)
+{
+  go2_navigation::PathAlignmentTurn turn;
+  const double preferred = .9;
+  const double alternate = turn.other_side(preferred, preferred);
+  EXPECT_DOUBLE_EQ(alternate, -.60);
+  turn.start(preferred, 0., 1., alternate, true);
+  ASSERT_TRUE(turn.escape());
+  turn.update(preferred + .1, -.30, 1.5);
+  EXPECT_NEAR(turn.remaining(1.30, -.30), -.30, 1.e-9);
+  turn.update(preferred, -.61, 2.);
+  EXPECT_LE(turn.direction() * turn.remaining(1.51, -.61), 0.);
+  EXPECT_DOUBLE_EQ(turn.other_side(-preferred, -preferred), .60);
+}
+
 TEST(RotationVelocity, AcceleratesSymmetricallyAndBrakes)
 {
   double left = 0.0;

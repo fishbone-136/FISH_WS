@@ -63,6 +63,52 @@ class TransientFragmentsTests(unittest.TestCase):
         memory.mark_xyz(points,(0.,0.,0.),10.)
         self.assertFalse(tracker.transient_flags(list(memory.cells),memory.cells).any())
 
+    def test_dense_near_packets_keep_unconfirmed_person_fragments_eligible(self):
+        memory=ObstacleMemory(require_3d_clearing=True,max_observation_gap=.6)
+        tracker=DynamicObstacles()
+        fragments=np.array([[.65,y,.65] for y in (-.2,-.1,0.,.1,.2)])
+        for i in range(8):
+            stamp=10.+i*.09
+            tracker.observe(fragments,(0.,0.,0.),stamp,memory.cells)
+            memory.mark_xyz(fragments,(0.,0.,0.),stamp)
+        self.assertFalse(tracker.dynamic_cells)
+        self.assertFalse(tracker.static_confirmed)
+        self.assertTrue(tracker.transient_flags(list(memory.cells),memory.cells).all())
+        self.clear(memory,tracker,self.floor(),8)
+        self.assertFalse(memory.cells)
+
+    def test_established_sparse_static_surface_keeps_normal_3d_clearing(self):
+        memory=ObstacleMemory(require_3d_clearing=True,max_observation_gap=.6)
+        tracker=DynamicObstacles()
+        surface=np.array([[.65,y,.65] for y in (-.2,-.1,0.,.1,.2)])
+        for i in range(20):
+            stamp=10.+i*.10
+            tracker.observe(surface,(0.,0.,0.),stamp,memory.cells)
+            memory.mark_xyz(surface,(0.,0.,0.),stamp)
+        self.assertTrue(tracker.static_confirmed)
+        self.assertFalse(tracker.transient_flags(list(memory.cells),memory.cells).any())
+        self.clear(memory,tracker,self.floor(),12)
+        self.assertEqual(len(memory.cells),5)
+
+    def test_near_moving_history_accepts_sparse_columns_but_never_a_shadow(self):
+        for dynamic,points,should_clear in (
+                (True,[[3.,.15,0.]],True),
+                (False,[[3.,.15,0.]],False),
+                (True,[[3.,.15,0.],[.4,.02,.3]],False),
+                (True,[],False),
+                (True,[[3.,1.,0.]],False)):
+            memory=ObstacleMemory(require_3d_clearing=True)
+            memory.mark_xyz([[.65,0.,.125]],(0.,0.,0.),10.)
+            for i in range(5):
+                snapshot=memory.cells.copy();keys=list(snapshot)
+                geometry=np.asarray(list(snapshot.values()),dtype=float).reshape(-1,7)
+                stamp=11.+i*.2
+                updates=clearing_delta(geometry,RayEvidence(points,[0.,0.,.4]),
+                    (0.,0.,0.),stamp,stamp-.2,ground_plane=[0.,0.,1.,0.],
+                    dynamic_flags=[dynamic]*len(keys))
+                memory.merge_delta(snapshot,keys,*updates,stamp)
+            self.assertEqual(not memory.cells,should_clear,(dynamic,points))
+
     def test_ground_visibility_requires_actual_floor_in_the_same_column(self):
         rays=RayEvidence([[3.,0.,.15]],[0.,0.,.4])
         self.assertTrue(rays.sees_beyond([[1.,0.]],[0.,0.,1.,0.])[0])

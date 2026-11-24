@@ -11,6 +11,7 @@ from rcl_interfaces.msg import SetParametersResult
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import PointCloud2, PointField
+from std_msgs.msg import Bool
 
 
 def coarsen_surface(points, costs, resolution):
@@ -35,8 +36,24 @@ class EnvironmentTerrainDisplay(Node):
         qos = QoSProfile(depth=1, reliability=ReliabilityPolicy.RELIABLE,
                          durability=DurabilityPolicy.TRANSIENT_LOCAL)
         self.output = self.create_publisher(PointCloud2, '/visualization/environment_terrain', qos)
+        self.localized = False
         self.create_subscription(PointCloud2, '/mapping/terrain_surface', self.on_cloud, qos)
+        self.create_subscription(Bool, '/lio/localization_valid', self.on_localization_valid, qos)
         self.last_size = None
+
+    def on_localization_valid(self, message):
+        self.localized = message.data
+        if not self.localized:
+            # Clear the latched colored historical overlay, not the saved map.
+            # Otherwise a stopped estimator still looks like live obstacles.
+            empty = PointCloud2()
+            empty.header.frame_id = 'map'
+            empty.header.stamp = self.get_clock().now().to_msg()
+            empty.height = 1
+            empty.point_step = 16
+            empty.fields = [PointField(name=k, offset=4*i, datatype=PointField.FLOAT32, count=1)
+                            for i, k in enumerate(('x', 'y', 'z', 'intensity'))]
+            self.output.publish(empty)
 
     @staticmethod
     def validate(parameters):
@@ -48,6 +65,8 @@ class EnvironmentTerrainDisplay(Node):
         return SetParametersResult(successful=True)
 
     def on_cloud(self, message):
+        if not self.localized:
+            return
         if self.output.get_subscription_count() == 0:
             return
         if not self.get_parameter('enabled').value:

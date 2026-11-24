@@ -27,7 +27,7 @@ from voice.command_safety import (
 )
 from voice.emergency_alarm import EmergencyAlarm
 from voice.llm_processor import OllamaInstructionParser
-from voice.local_asr import LocalAsrError, LocalWhisperASR
+from voice.local_asr import LocalAsrError, create_local_asr
 from voice.ollama_client import OllamaClient, OllamaError
 from voice.text_motion import parse_relative_command_body, describe_action
 
@@ -58,7 +58,7 @@ class SpeechController:
             self._recog.phrase_threshold = max(
                 0.2, config.MICROPHONE_PHRASE_THRESHOLD
             )
-        self._asr = LocalWhisperASR()
+        self._asr = create_local_asr()
         self._asr.on_progress = self._on_asr_progress
         self._llm = OllamaInstructionParser()
         self._alarm = EmergencyAlarm()
@@ -228,12 +228,12 @@ class SpeechController:
                     asr_seconds = float(self._asr.last_result.get("total_seconds", 0.0))
                     logging.info(
                         "ASR 完成：录音=%.3fs，识别=%.3fs，主模型=%.3fs，复核加载=%.3fs，"
-                        "复核解码=%.3fs，有效文本=%s，静音概率=%.3f，拒绝原因=%s",
+                        "复核解码=%.3fs，有效文本=%s，静音概率=%s，拒绝原因=%s",
                         audio_seconds, asr_seconds,
                         float(self._asr.last_result.get("primary_seconds", 0.0)),
                         float(self._asr.last_result.get("rescue_load_seconds", 0.0)),
                         float(self._asr.last_result.get("rescue_decode_seconds", 0.0)),
-                        bool(text), float(self._asr.last_result.get("no_speech_prob", 0.0)),
+                        bool(text), self._asr.last_result.get("no_speech_prob", "当前引擎未提供"),
                         self._asr.last_result.get("rejection_reason", ""),
                     )
                     if self._asr.last_result.get("rescue_attempted"):

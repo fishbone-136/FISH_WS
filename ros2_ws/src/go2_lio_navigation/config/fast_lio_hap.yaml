@@ -38,9 +38,9 @@
       # undistortion keeps per-point timing.
       lidar_type: 5
       scan_line: 6
-      blind: 0.25
+      blind: 0.05
       timestamp_unit: 3
-      scan_rate: 15
+      scan_rate: 20
 
     mapping:
       # Values are conservative startup defaults. Replace them with Allan

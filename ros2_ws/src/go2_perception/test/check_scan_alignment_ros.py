@@ -39,6 +39,7 @@ def main():
             '-r','ground_plane:=/test/aligned_ground',
             '-p','target_frame:=base_link_3d','-p','scan_frame:=base_link','-p','level_scan:=true',
             '-p','ground_filter_enabled:=true','-p','observed_free_space_only:=true',
+            '-p','require_ground_for_scan:=true',
             '-p','ground_pose_topic:=/Odometry_validated','-p','range_min:=0.25',
             '-p','range_max:=5.5','-p','point_spread_radius:=0.0',
             '-p','max_fill_gap_bins:=0','-p','angle_increment:=0.00698','--log-level','warn'])
@@ -67,6 +68,7 @@ def main():
         points=(np.r_[ground,box]@rz.T)@rotation-offset
         fields=[PointField(name=k,offset=i*4,datatype=PointField.FLOAT32,count=1) for i,k in enumerate(('x','y','z'))]
         age=[0.]
+        include_ground=[False]
         def publish():
             stamp=node.get_clock().now().to_msg();m=Odometry();m.header.stamp=stamp
             m.header.frame_id='odom_lio';m.child_frame_id='livox_frame'
@@ -80,7 +82,8 @@ def main():
             if age[0]:m.header.stamp=Time(nanoseconds=node.get_clock().now().nanoseconds-int(age[0]*1e9)).to_msg()
             odom.publish(m)
             h=TransformStamped().header;h.frame_id='livox_frame';h.stamp=stamp
-            cloud.publish(point_cloud2.create_cloud(h,fields,points.astype(np.float32)))
+            frame = points if include_ground[0] else points[-len(box):]
+            cloud.publish(point_cloud2.create_cloud(h,fields,frame.astype(np.float32)))
         node.create_timer(1./15.,publish)
         def until(check,timeout=12.):
             end=time.monotonic()+timeout
@@ -88,6 +91,14 @@ def main():
                 rclpy.spin_once(node,timeout_sec=.02)
                 if check():return
             raise AssertionError('Timed out waiting for '+str(latest.keys()))
+        until(lambda:'points' in latest and 'memory' in latest
+              and any(field.name=='unclassified' for field in latest['points'].fields))
+        end=time.monotonic()+.3;until(lambda:time.monotonic()>=end,timeout=1.)
+        assert 'scan' not in latest
+        assert latest['points'].width==0
+        assert latest['memory'].header.frame_id=='unavailable'
+        print('PASS no ground: unclassified input cannot paint a navigation obstacle',flush=True)
+        include_ground[0]=True
         until(lambda:'scan' in latest and 'points' in latest and 'memory' in latest
               and latest['memory'].header.frame_id=='odom_lio' and latest['memory'].width>0)
         scan=latest['scan'];assert scan.header.frame_id=='base_link'

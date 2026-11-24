@@ -22,6 +22,7 @@ def generate_launch_description():
             "use_sim_time": LaunchConfiguration("use_sim_time"),
             "use_rviz": LaunchConfiguration("use_rviz"),
             "video_enable": LaunchConfiguration("video_enable"),
+            "lidar_source": LaunchConfiguration("lidar_source"),
             "start_hap_driver": LaunchConfiguration("start_hap_driver"),
             "use_best_effort": LaunchConfiguration("use_best_effort"),
             "accumulation_frames": LaunchConfiguration("accumulation_frames"),
@@ -34,6 +35,7 @@ def generate_launch_description():
         DeclareLaunchArgument("use_sim_time", default_value="false"),
         DeclareLaunchArgument("use_rviz", default_value="true"),
         DeclareLaunchArgument("video_enable", default_value="false"),
+        DeclareLaunchArgument("lidar_source", default_value="unitree", choices=["unitree", "hap"]),
         DeclareLaunchArgument("start_hap_driver", default_value="true"),
         DeclareLaunchArgument("use_best_effort", default_value="true"),
         DeclareLaunchArgument(

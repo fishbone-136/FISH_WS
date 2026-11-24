@@ -4,6 +4,12 @@ from copy import deepcopy
 import numpy as np
 from scipy.spatial import cKDTree
 
+# Cover the immediate approach and detour area with fast, direct 3-D clearing.
+FAST_CLEAR_RADIUS = 1.8
+# Follow confirmed moving history out to the edge of the local planning window.
+MOVING_CLEAR_RADIUS = 2.5
+UNITREE_NEAR_CLEAR_RADIUS = .50
+
 
 def clear_confirmed_region(data,pose,bounds=(-.5,.5,-.4,-.2),minimum_age=5.,allowed_hits=None):
     """Explicit operator-confirmed free space; never automatic blind expiry.
@@ -108,7 +114,7 @@ def navigation_grid(data,width,height,source_resolution,target_resolution):
 
 def clearing_delta(geometry,rays,pose,stamp,previous_stamp,clear_window=4.,
                    max_gap=.60,clear_frames=8,clear_seconds=.5,radius=20.,ground_plane=None,
-                   dynamic_flags=None,transient_flags=None):
+                   dynamic_flags=None,transient_flags=None,near_fast=False,near_rays=None):
     """Vectorized 3-D counter updates; return only changed rows, never geometry.
 
     Layout is the same seven columns stored in ObstacleMemory.cells. NaN
@@ -118,14 +124,22 @@ def clearing_delta(geometry,rays,pose,stamp,previous_stamp,clear_window=4.,
     empty=(np.empty(0,dtype=np.int64),np.empty((0,2)),np.empty(0,dtype=bool))
     if not len(geometry) or stamp<=previous_stamp:return empty
     free,support=rays.classify_many(geometry[:,:2],geometry[:,5],geometry[:,6])
-    dynamic=np.zeros(len(geometry),dtype=bool)
+    primary_support=support.copy() if near_rays is not None else None
+    # Only actual 3-D beam crossings qualify for class-independent fast
+    # removal. Floor/column inference retains its separate stricter rule.
+    direct_free=free.copy()
+    body_distance_sq=np.sum((geometry[:,:2]-pose[:2])**2,axis=1)
+    near_columns=body_distance_sq<=1.25**2
+    transient=np.zeros(len(geometry),dtype=bool)
+    dynamic=(np.asarray(dynamic_flags,dtype=bool).reshape(len(geometry))
+             if dynamic_flags is not None else np.zeros(len(geometry),dtype=bool))
     if ground_plane is not None:
         normal,offset=np.asarray(ground_plane[:3]),float(ground_plane[3])
         if not np.isfinite(ground_plane).all() or abs(np.linalg.norm(normal)-1.)>.001 or normal[2]<.9:
             raise ValueError('Invalid world ground plane')
         lower=geometry[:,:2]@normal[:2]+normal[2]*geometry[:,5]+offset
         upper=geometry[:,:2]@normal[:2]+normal[2]*geometry[:,6]+offset
-        near=np.sum((geometry[:,:2]-pose[:2])**2,axis=1)<=2.**2
+        near=body_distance_sq<=2.**2
         # Only whole measured volumes within 6 cm of a supported local floor
         # qualify. A 10 cm box/leg remains occupied. Visibility or a strongly
         # measured current floor is needed before reclassifying old ground.
@@ -140,10 +154,16 @@ def clearing_delta(geometry,rays,pose,stamp,previous_stamp,clear_window=4.,
             floor=candidates[visible]
             free[floor]=True;support[floor]=False
         if dynamic_flags is not None:
-            dynamic=np.asarray(dynamic_flags,dtype=bool).reshape(len(geometry))
             selected=np.flatnonzero(dynamic)
             if len(selected):
                 seen=rays.sees_beyond(geometry[selected,:2],ground_plane)
+                # A close moving surface is fragmented by the HAP scan pattern.
+                # Accept a 6 cm observed column only for already moving history;
+                # every closer return in that wider column still vetoes removal.
+                close=selected[near_columns[selected]]
+                if len(close):
+                    seen_close=rays.sees_beyond(geometry[close,:2],ground_plane,column_radius=.06)
+                    free[close]|=seen_close&~support[close]
                 free[selected]|=seen&~support[selected]
         if transient_flags is not None and rays.ground_supported(ground_plane):
             # Sparse pedestrian fragments may never form a compact track.
@@ -154,6 +174,23 @@ def clearing_delta(geometry,rays,pose,stamp,previous_stamp,clear_window=4.,
             selected=np.flatnonzero(transient&~dynamic&~support)
             if len(selected):
                 free[selected]|=rays.sees_beyond(geometry[selected,:2],ground_plane,ground_only=True)
+                close=selected[near_columns[selected]]
+                if len(close):
+                    free[close]|=rays.sees_beyond(geometry[close,:2],ground_plane,
+                        ground_only=True,column_radius=.06)&~support[close]
+    if near_rays is not None:
+        # Raw Unitree rays can expose space under and around the chassis that
+        # the factory navigation cloud omits. Use them only for real crossings
+        # close to the body, with any current occupied support taking precedence.
+        selected=np.flatnonzero(body_distance_sq<=UNITREE_NEAR_CLEAR_RADIUS**2)
+        if len(selected):
+            rows=geometry[selected]
+            ray_free,ray_support=near_rays.classify_many(rows[:,:2],rows[:,5],rows[:,6],
+                near_ground_plane=(ground_plane if ground_plane is not None and
+                                   rays.ground_supported(ground_plane) else None))
+            direct_free[selected]|=ray_free
+            support[selected]=primary_support[selected]|ray_support
+            free[selected]=(free[selected]|ray_free)&~support[selected]
     since=geometry[:,3].copy();count=geometry[:,4].copy()
     reset=np.isfinite(since)&(stamp-since>clear_window)
     if stamp-previous_stamp>max_gap:reset[:]=True
@@ -161,8 +198,22 @@ def clearing_delta(geometry,rays,pose,stamp,previous_stamp,clear_window=4.,
     since[reset]=np.nan;count[reset]=0
     since[free&~np.isfinite(since)]=stamp
     count[free]+=1
-    frames=np.where(dynamic,3,clear_frames);seconds=np.where(dynamic,.35,clear_seconds)
-    remove=(np.sum((geometry[:,:2]-pose[:2])**2,axis=1)>radius**2)|(
+    # Distant motion classifications still require a ground reference for the
+    # ordinary relaxed rule. Pure 3-D evidence uses its own priority below.
+    referenced_motion=dynamic if ground_plane is not None else False
+    frames=np.where(referenced_motion,3,clear_frames)
+    seconds=np.where(referenced_motion,.35,clear_seconds)
+    if near_fast:
+        # A parked person must not require longer confirmation merely because
+        # it acquired a static label. Direct 3-D empty-space proof is the same.
+        in_priority_range=(body_distance_sq<=FAST_CLEAR_RADIUS**2)|(
+            dynamic&(body_distance_sq<=MOVING_CLEAR_RADIUS**2))
+        direct=in_priority_range&direct_free&~support
+        fragments=near_columns&transient&free&~support
+        moving=near_columns&dynamic&free&~support
+        frames=np.where(direct|moving,3,np.where(fragments,4,frames))
+        seconds=np.where(direct|moving,.20,np.where(fragments,.30,seconds))
+    remove=(body_distance_sq>radius**2)|(
         free&(count>=frames)&(stamp-since>=seconds))
     unchanged_since=(since==geometry[:,3])|(np.isnan(since)&np.isnan(geometry[:,3]))
     changed=np.flatnonzero(remove|~unchanged_since|(count!=geometry[:,4]))
@@ -183,12 +234,12 @@ def reference_clear_volumes(cells, ground_plane, radius=.04):
 
 class RayEvidence:
     """Actual current 3-D returns, used to clear the old object's height volume."""
-    def __init__(self, points, origin, resolution=.05):
+    def __init__(self, points, origin, resolution=.05, minimum_horizontal_range=.05):
         self.origin=np.asarray(origin,dtype=float)
         points=np.asarray(points,dtype=float).reshape(-1,3)
         points=points[np.isfinite(points).all(axis=1)]
         distance=np.linalg.norm(points[:,:2]-self.origin[:2],axis=1)
-        valid=(distance>.25)&(distance<=5.5)
+        valid=(distance>minimum_horizontal_range)&(distance<=5.5)
         self.points=points[valid]
         self.tree=cKDTree(self.points[:,:2])
         self.distance=distance[valid]
@@ -203,6 +254,8 @@ class RayEvidence:
         self.sorted_indices=np.tile(order,3)
         self.sorted_angles=np.concatenate((self.angles[order]-2*math.pi,
                                            self.angles[order],self.angles[order]+2*math.pi))
+        self._ground_plane = None
+        self._ground_heights = None
 
     def pairs(self,xy,radius):
         groups=self.tree.query_ball_point(xy,radius,return_sorted=False)
@@ -220,7 +273,7 @@ class RayEvidence:
         low[narrow],high[narrow]=mid-.025,mid+.025
         return [(float(a),float(b)) if ok else None for a,b,ok in zip(low,high,valid)]
 
-    def classify_many(self,xy,low,high):
+    def classify_many(self,xy,low,high,near_ground_plane=None):
         """Return independent free-ray and occupied-support evidence.
 
         Filter distance, height and angular visibility before expanding ray
@@ -230,13 +283,22 @@ class RayEvidence:
         low,high=np.asarray(low,dtype=float),np.asarray(high,dtype=float)
         count=len(xy);result=np.zeros(count,dtype=bool)
         supported=np.zeros(count,dtype=bool)
-        if not count:return result,supported
+        if not count or not len(self.points):return result,supported
         delta=xy-self.origin[:2];distance=np.linalg.norm(delta,axis=1)
         # The sensor's minimum *return* range is not a minimum ray crossing
         # range. A finite farther return also traverses the near segment.
         # Keep the actual height/occlusion tests below for that segment.
         eligible=np.flatnonzero((distance>self.clearance_radius)&(distance<=5.5)&
                                np.isfinite(low)&np.isfinite(high))
+        # A return outside the larger occupied-support angular interval can
+        # neither support this cell nor intersect its narrower clear ray.
+        angles = np.arctan2(delta[eligible,1], delta[eligible,0])
+        support_width = np.arcsin(np.minimum(1., .025 / distance[eligible])) + 1.e-10
+        start = np.searchsorted(self.sorted_angles, angles - support_width)
+        end = np.searchsorted(self.sorted_angles, angles + support_width, side='right')
+        possible = (end > start) | (distance[eligible] <= .025)
+        eligible = eligible[possible]
+        angles = angles[possible]
         if not len(eligible):return result,supported
         cells,points=self.pairs(xy[eligible],.025)
         cells=eligible[cells]
@@ -244,9 +306,10 @@ class RayEvidence:
         # Repeated indices all receive True; no atomic/reduction operation is
         # needed. Avoid a per-pair reduction when only setting membership bits.
         supported[cells[support]]=True
-        eligible=eligible[~supported[eligible]]
+        unsupported = ~supported[eligible]
+        eligible = eligible[unsupported]
+        angles = angles[unsupported]
         if not len(eligible):return result,supported
-        angles=np.arctan2(delta[eligible,1],delta[eligible,0])
         half=np.arcsin(np.minimum(1.,self.clearance_radius/distance[eligible]))+1.e-10
         starts=np.searchsorted(self.sorted_angles,angles-half)
         ends=np.searchsorted(self.sorted_angles,angles+half,side='right')
@@ -259,23 +322,43 @@ class RayEvidence:
         projected=distance[cells]*np.cos(difference)
         z=self.origin[2]+(self.points[points,2]-self.origin[2])*projected/self.distance[points]
         blocked=np.zeros(count,dtype=bool)
-        shadow=(self.distance[points]<projected+.05)&(z>low[cells]-.01)&(z<high[cells]+.01)
+        remaining=self.distance[points]-projected
+        short=remaining<.05
+        beyond=remaining>.20
+        if near_ground_plane is not None:
+            dz=self.points[points,2]-self.origin[2]
+            # At a corridor exit a real beam may cross the old cell and hit
+            # visible floor before the 20 cm horizontal overrun. Use travel
+            # along the beam only when its endpoint is outside the corridor
+            # and falls safely below the entire recorded obstacle band.
+            floor_height=np.abs(self.ground_heights(near_ground_plane)[points])
+            below=low[cells]-self.points[points,2]
+            steep=(distance[cells]<=.15)&(dz<-self.distance[points])
+            past_volume=(remaining>self.clearance_radius)&(below>.04)
+            travel=remaining[past_volume]*np.hypot(1.,dz[past_volume]/self.distance[points[past_volume]])
+            floor_end=(floor_height<=.045)|((floor_height<=.06)&(below>.06)&steep)
+            travel_shadow=np.where(floor_end[past_volume],travel<.05,travel<=.10)
+            # An endpoint already beyond and below the volume cannot shadow
+            # a crossing. Floor fit is needed to *supply* the clear evidence.
+            short[past_volume]&=travel_shadow
+            beyond[past_volume]|=floor_end[past_volume]&(travel>.10)
+        shadow=short&(z>low[cells]-.01)&(z<high[cells]+.01)
         blocked[cells[shadow]]=True
-        good=(projected>0.)&(self.distance[points]>projected+.20)&(z>low[cells]+.01)&(z<high[cells]-.01)
+        good=(projected>0.)&beyond&(z>low[cells]+.01)&(z<high[cells]-.01)
         result[cells[good]]=True
         return result&~blocked,supported
 
     def clears_many(self,xy,low,high):
         return self.classify_many(xy,low,high)[0]
 
-    def sees_beyond(self,xy,ground_plane=None,ground_only=False):
+    def sees_beyond(self,xy,ground_plane=None,ground_only=False,column_radius=.02):
         """Measured column visibility for already floor-consistent volumes."""
         xy=np.asarray(xy,dtype=float).reshape(-1,2)
         delta=xy-self.origin[:2];distance=np.linalg.norm(delta,axis=1)
         result=np.zeros(len(xy),dtype=bool);blocked=result.copy()
         eligible=np.flatnonzero((distance>self.clearance_radius)&(distance<=5.5))
         angles=np.arctan2(delta[eligible,1],delta[eligible,0])
-        half=np.arcsin(np.minimum(1.,.02/distance[eligible]))+1.e-10
+        half=np.arcsin(np.minimum(1.,column_radius/distance[eligible]))+1.e-10
         start=np.searchsorted(self.sorted_angles,angles-half)
         end=np.searchsorted(self.sorted_angles,angles+half,side='right');counts=end-start
         if not counts.sum():return result
@@ -287,7 +370,7 @@ class RayEvidence:
         closer=self.distance[points]<=projected+.05
         if ground_plane is not None:
             # Floor endpoints do not occlude a tracked moving body's column.
-            height=self.points[points]@np.asarray(ground_plane[:3])+ground_plane[3]
+            height=self.ground_heights(ground_plane)[points]
             closer&=height>.08
             if ground_only:beyond&=np.abs(height)<=.03
         elif ground_only:
@@ -296,8 +379,15 @@ class RayEvidence:
         blocked[cells[closer]]=True
         return result&~blocked
 
+    def ground_heights(self, plane):
+        key = tuple(plane)
+        if key != self._ground_plane:
+            self._ground_heights = self.points @ np.asarray(key[:3]) + key[3]
+            self._ground_plane = key
+        return self._ground_heights
+
     def ground_supported(self,plane):
-        height=self.points@np.asarray(plane[:3])+plane[3]
+        height=self.ground_heights(plane)
         xy=self.points[np.abs(height)<.025,:2]
         return len(xy)>=40 and np.linalg.eigvalsh(np.cov(xy.T))[0]>.01
 
@@ -305,7 +395,7 @@ class RayEvidence:
         xy=np.asarray(xy,dtype=float).reshape(-1,2)
         result=np.zeros(len(xy),dtype=bool)
         cells,points=self.pairs(xy,.04)
-        height=self.points[points]@np.asarray(plane[:3])+plane[3]
+        height=self.ground_heights(plane)[points]
         result[cells[np.abs(height)<=.03]]=True
         return result
 
@@ -439,13 +529,25 @@ class ObstacleMemory:
         self.cleared+=removed
         return removed
 
-    def clearing_snapshot(self,origin,stamp):
-        """Copy only old cells within the raw sensor's 3-D clearing envelope."""
-        return {key:p for key,p in self.cells.items()
-            if stamp-p[2]>=self.clear_seconds and p[5] is not None and
-            (p[0]-origin[0])**2+(p[1]-origin[1])**2<=5.5**2}
+    def clearing_snapshot(self,origin,stamp,near_position=None,near_only=False,radius=5.5,
+                          moving_cells=()):
+        """Apply lidar range and body-centred clearing priority independently."""
+        result={}
+        for key,p in self.cells.items():
+            if p[5] is None or (p[0]-origin[0])**2+(p[1]-origin[1])**2>radius**2:
+                continue
+            priority_radius=MOVING_CLEAR_RADIUS if key in moving_cells else FAST_CLEAR_RADIUS
+            near=(near_position is not None and
+                  (p[0]-near_position[0])**2+(p[1]-near_position[1])**2<=priority_radius**2)
+            if near_only and not near:
+                continue
+            minimum_age=.10 if near else self.clear_seconds
+            if stamp-p[2]>=minimum_age:
+                result[key]=p
+        return result
 
-    def merge_delta(self,snapshot,keys,indices,states,removed,stamp,cleared_cells=None):
+    def merge_delta(self,snapshot,keys,indices,states,removed,stamp,cleared_cells=None,
+                    cleared_keys=None):
         """Merge sparse worker counters only if the original cell is unchanged."""
         deleted=0
         for index,state,erase in zip(indices,states,removed):
@@ -454,6 +556,7 @@ class ObstacleMemory:
             if erase:
                 del self.cells[key];deleted+=1
                 if cleared_cells is not None:cleared_cells.append(original)
+                if cleared_keys is not None:cleared_keys.append(key)
             else:
                 since=float(state[0]) if math.isfinite(state[0]) else None
                 self.cells[key]=(*current[:3],since,int(state[1]),*current[5:])

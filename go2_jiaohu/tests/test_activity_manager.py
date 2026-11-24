@@ -61,3 +61,17 @@ def test_start_exception_cleans_up_and_allows_next_activation():
     assert manager.active is None
     assert events == ["acquire camera", "release camera"]
     assert manager.activate("voice") is True
+
+
+def test_async_stop_blocks_new_activity_until_resources_are_released():
+    events,done = [],[False]
+    manager = ExclusiveActivityManager()
+    manager.register('follow',lambda:True,lambda:done[0])
+    manager.register('voice',lambda:events.append('start voice'),lambda:None)
+    assert manager.activate('follow')
+    assert manager.activate('voice') is False
+    assert manager.active == 'follow'
+    assert events == []
+    done[0] = True
+    assert manager.activate('voice')
+    assert events == ['start voice']

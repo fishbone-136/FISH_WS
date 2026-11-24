@@ -1,10 +1,10 @@
-# Go2 HAP LIO navigation
+# Go2 2.5-D navigation
 
 This package brings up the following online mapping and navigation chain:
 
 ```text
-HAP PointCloud2 (per-point timestamps) + HAP IMU
-        -> FAST-LIO2 (odom_lio)
+Unitree factory odometry + timed factory and raw LiDAR returns
+        -> Unitree navigation source (odom_lio)
         -> Scan Context + GICP loop detection
         -> GTSAM iSAM2 pose graph (map -> odom_lio)
         -> 2.5-D elevation/traversability grids
@@ -25,7 +25,8 @@ input stays intact for goal-update detection. Non-LIO mode retains map goals.
 
 `odom_lio -> base_link` is the planar navigation pose;
 `odom_lio -> base_link_3d` retains the validated physical roll, pitch and height.
-The physical sensor mount is `base_link_3d -> livox_frame`. Both projector lanes
+The sensor frame is `unitree_lidar_aligned` in Unitree mode and `livox_frame`
+in HAP mode, each mounted from `base_link_3d`. The projectors
 filter in `base_link_3d` and level only their LaserScan XY into `base_link` using
 the matching validated attitude. Genuine obstacle XYZ and ground planes stay
 in `base_link_3d`; memory uses their full acquisition pose. A missing fresh
@@ -35,16 +36,42 @@ RViz starts close to an overhead view to prevent measured ground height versus
 the planar navigation plane creating a misleading perspective offset. Actual
 2.5-D heights remain in the terrain displays and can still be inspected in 3-D.
 
-An unexpected FAST-LIO exit now latches localization invalid, cancels the active
+An unexpected localization source exit latches localization invalid, cancels the active
 goal and pauses Nav2 while keeping the owning launch and RViz open. A red fault
 message points to the LiDAR/USB connection. Restore the connection and restart
 the launch to reinitialize localization; old goals are not resumed in a new
 LIO coordinate session. Normal Ctrl+C still closes the whole launch.
 
+The Unitree source pairs raw and factory body clouds by device timestamp.
+It validates their factory transform and preserves measured near returns ahead
+of the body. Per-point time offsets and bracketing factory odometry deskew
+the cloud. Native odometry arrivals align the device clock to the host's
+monotonic clock. A bounded correction follows clock drift. ROS timestamps
+retain their monotonic ordering, including after host wall-clock changes.
+The mapping estimates relative delay and does not measure absolute transport
+delay independently.
+
+The Unitree projector supplies `/scan` and `/scan_safety` from the same
+ground fit and scan timestamp. The raw near-field stop check remains a direct
+subscriber to native clouds. The source reports scan age, rejected frames and
+clock state on `/unitree/navigation_source/status`. A cloud dropout suspends
+localization and scan outputs. A confirmed clock reset requires a new session.
+
+Unitree loop closure measures travel at the body center. An earlier view can
+also be considered after a turn when the robot returns near it with a similar
+heading. The independent submaps must still pass GICP overlap, surface-normal
+and correction bounds. Accepted loops align the historical map and
+`map -> odom_lio`. The local driving frame remains continuous.
+
+Select `lidar_source:=hap` to use the HAP and its IMU with FAST-LIO2.
+For a stationary 2.5-D preview use
+`bash scripts/run_lio_navigation.sh enable_go2_base:=false enable_nav2:=false`.
+
 ## Dependencies and build
 
-The current workspace uses the Livox driver installed in
-`/home/fishbone/GO2/livox_ws` and GTSAM installed under `/usr/local`.
+The Unitree build uses ROS 2 Humble and GTSAM. Run `bash scripts/build.sh`
+from the repository root. Use `bash scripts/build.sh --hap` to also build
+the Livox driver and FAST-LIO.
 
 ```bash
 source /opt/ros/humble/setup.bash
@@ -179,8 +206,9 @@ points are never persisted. Each occupied cell retains measured world-height
 bounds from its first observation; roll, pitch and height are included before
 projecting into the XY grid. Writes do not wait for the clearing cloud worker.
 The protective memory snapshot publishes
-at 15 Hz with its actual scan timestamp. Expensive 3-D clearing runs in a single
-spawned worker process at up to 6 Hz, isolating Python CPU work from the ROS
+at 20 Hz by default with its actual scan timestamp. Expensive 3-D clearing runs
+in a single spawned worker process with a default dispatch ceiling of 12 Hz,
+isolating Python CPU work from the ROS
 callback interpreter; stale results are discarded, and an old result
 cannot erase or rewind a newer occupied hit. It retains obstacles
 through unobserved sectors and missing returns, independently of terrain history
@@ -188,6 +216,13 @@ and Nav2 costmap clearing. Repeated matching 3-D rays passing through the
 old obstacle's measured height volume clear static records. Raw returns still
 supporting that volume veto clearing. Infinity in a ground-filtered 2-D scan
 alone is not evidence that an obstacle has disappeared.
+
+Within 1.8 m of the robot centre, cells with a clear ray through the measured
+height volume use the near-priority clearing queue and the shorter confirmation
+threshold. Confirmed moving obstacles use that queue for direct 3-D evidence
+out to 2.5 m. A broad clearing job is followed by a dedicated near pass when
+near candidates exist, even if the broad job ran past its scheduling deadline.
+Fresh occupied returns and occlusions still prevent removal.
 
 The `motion_evidence_v6` policy also tracks compact obstacle clusters in world
 coordinates at the observation rate, up to 20 Hz. Four coherent positions spanning at least 0.18 s
@@ -238,6 +273,16 @@ A `positive_only` observation disables floor/column inference, but a timestamp-
 paired raw cloud can still prove a 3-D beam segment through an old volume free.
 The raw subscriber keeps eight queued frames for pairing; absent raw data never
 supplies clearing evidence. No time-only expiry is used.
+The Unitree adapter also supplies `/unitree/near_clearance_rays` to obstacle
+memory. It uses the same timestamp and validated pose as the navigation cloud
+and is available when the lidar origin changes by at most 5 mm during the scan.
+Within 0.50 m of the body centre, these raw rays can confirm empty space through
+old cells that the factory-filtered cloud cannot see. Rays ending on a
+measured floor can use distance along the beam, including short oblique rays
+at corridor exits. The endpoint must lie outside the old cell's ray corridor
+and below its recorded height band. Nearer occluders and current occupied
+returns still veto removal.
+`unitree_ray_frame_paired` indicates that a clearing job used the additional rays.
 `/safety/obstacle_memory_status` reports `clearing_policy`, candidate counts,
 completed jobs, removed cells, `last_clearing_result_age` and
 `clearing_observation_resets` for checking progress. The isolated ROS check
@@ -258,8 +303,10 @@ operation, not an automatic obstacle lifetime or whole-map reset.
 
 The worker receives numeric cell arrays and returns only changed confirmation
 counters/deletions. Main-process merges still reject updates to newer occupied
-hits. Safety-grid publication targets 10 Hz and caches refinement of unchanged
-terrain messages; aligned 8-to-4 cm refinement repeats cells exactly, including
+hits. The merged navigation grids have a scheduled publication ceiling of
+15 Hz, reduced to 8 Hz under high CPU load. Proven removals publish immediately.
+The mapper caches refinement of unchanged terrain messages. Aligned 8-to-4 cm
+refinement repeats cells exactly, including
 unknowns and thin obstacles. The `memory_publish_rate`, `navigation_publish_rate`
 and `clearing_rate` parameters can be changed online without losing memory.
 New terrain grids have cell-aligned world origins and retain the actual cloud
@@ -408,9 +455,14 @@ before trajectory simulation. Humble's ordinary iterator accepts minimum
 translation OR minimum yaw, which otherwise admits tiny walking arcs when
 turning quickly. Genuine in-place turns and normal walking arcs remain;
 all retained candidates still use the full trajectory footprint checks.
-The behavior tree
-replans at 2 Hz. The stable-rotation shim preserves its ramp/direction for a
-replan to the same goal. Commands pass through the independent collision
+The LIO behavior tree requests replans at 4 Hz and retries after a 400 ms
+pause when planning fails. DWB gives more weight to following the current path
+so it can take a detour that initially moves away from the goal. The controller
+checks projected returns against the HAP near-contact region along its braking
+arc. In a narrow passage, DWB navigation uses both measured walls to steer
+the 76 × 35 cm protected body toward the middle. The stable-rotation shim
+preserves its ramp and direction on replans to the same goal. Commands pass
+through the independent collision
 monitor and observation freshness gate before reaching the base:
 
 ```text

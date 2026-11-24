@@ -261,6 +261,33 @@ def close_clearance_scale(points, vx, vy, wz, half_length=.51, half_width=.33):
                angular_limit/abs(wz) if abs(wz) > angular_limit else 1.)
 
 
+class TurnRecoveryHold:
+    """Stop immediately, then wait briefly for a stable clear turn."""
+
+    def __init__(self, clear_seconds=.10):
+        self.clear_seconds = clear_seconds
+        self.blocked = False
+        self.clear_since = None
+
+    def allows(self, turning, permitted, now):
+        if not turning:
+            self.clear_since = None
+            return True
+        if not permitted:
+            self.blocked = True
+            self.clear_since = None
+            return False
+        if not self.blocked:
+            return True
+        if self.clear_since is None:
+            self.clear_since = now
+        if now - self.clear_since < self.clear_seconds:
+            return False
+        self.blocked = False
+        self.clear_since = None
+        return True
+
+
 class SafetyRecoveryRamp:
     """Apply safety reductions immediately; ramp only recovery accelerations.
 

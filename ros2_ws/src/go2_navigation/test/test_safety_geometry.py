@@ -13,7 +13,7 @@ from go2_navigation.safety_geometry import (configured_protection, protected_rec
 
 
 class SafetyGeometryTests(unittest.TestCase):
-    def test_explicit_point_experiment_keeps_soft_inflation_and_disables_polygon_actions(self):
+    def test_point_planning_keeps_real_body_stop_and_approach_actions(self):
         root = Path(__file__).resolve().parents[2]
         config = root/'go2_navigation/config/nav2_params.yaml'
         document = yaml.safe_load(config.read_text())
@@ -21,16 +21,17 @@ class SafetyGeometryTests(unittest.TestCase):
             parameters = document[name][name]['ros__parameters']
             self.assertEqual(protected_rectangle(parameters, allow_point=True), (0., 0., 0.))
             self.assertEqual(parameters['inflation_layer']['plugin'], 'nav2_costmap_2d::InflationLayer')
-            self.assertEqual(parameters['inflation_layer']['inflation_radius'], .30)
+            self.assertEqual(parameters['inflation_layer']['inflation_radius'], .18)
         self.assertNotIn('ObstacleFootprint',
                          document['controller_server']['ros__parameters']['FollowPath']['critics'])
         front, rear, half_width = configured_protection(config)
-        self.assertEqual((front, rear, half_width), (0., 0., 0.))
+        self.assertEqual((front, rear, half_width), (.38, .38, .175))
         self.assertEqual(collision_monitor_parameters(config),
-                         {'EmergencyStop.enabled': False, 'FootprintApproach.enabled': False})
+                         {'EmergencyStop.enabled': True, 'FootprintApproach.enabled': True,
+                          'EmergencyStop.points': rectangle_points(.38, .38, .175)})
         stop = yaml.safe_load((root/'go2_lio_navigation/config/collision_monitor.yaml').read_text())
-        self.assertFalse(stop['collision_monitor']['ros__parameters']['EmergencyStop']['enabled'])
-        self.assertFalse(stop['collision_monitor']['ros__parameters']['FootprintApproach']['enabled'])
+        self.assertTrue(stop['collision_monitor']['ros__parameters']['EmergencyStop']['enabled'])
+        self.assertTrue(stop['collision_monitor']['ros__parameters']['FootprintApproach']['enabled'])
         self.assertEqual(stop['collision_monitor']['ros__parameters']['FootprintApproach']['footprint_topic'],
                          '/safety/body_footprint')
 
@@ -40,10 +41,10 @@ class SafetyGeometryTests(unittest.TestCase):
         document['physical_safety']['ros__parameters']['collision_model'] = 'rectangle'
         with tempfile.TemporaryDirectory() as folder:
             config = Path(folder)/'params.yaml';config.write_text(yaml.safe_dump(document))
-            self.assertEqual(configured_protection(config), (.38, .38, .15))
+            self.assertEqual(configured_protection(config), (.38, .38, .175))
             self.assertEqual(collision_monitor_parameters(config), {
                 'EmergencyStop.enabled': True, 'FootprintApproach.enabled': True,
-                'EmergencyStop.points': rectangle_points(.38, .38, .15)})
+                'EmergencyStop.points': rectangle_points(.38, .38, .175)})
 
     def test_point_planning_without_physical_safety_cannot_disable_stopping(self):
         p={'footprint':[[0.,0.]]*4, 'footprint_padding':0.}

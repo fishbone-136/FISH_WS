@@ -1,6 +1,6 @@
 <library path="go2_gait_safety_critic">
   <class type="go2_navigation::GaitSafetyCritic" base_class_type="dwb_core::TrajectoryCritic">
-    <description>Enforce gait and near-obstacle velocity bounds before scoring, with soft command continuity.</description>
+    <description>Enforce gait and execution bounds, with command continuity and bounded collision-checked pure-turn commitment.</description>
   </class>
   <class type="go2_navigation::CollisionFootprintCritic" base_class_type="dwb_core::TrajectoryCritic">
     <description>Preserve corner clearance in detours; suppress duplicate soft scores only in supported corridors, with hard collision rejection always active.</description>

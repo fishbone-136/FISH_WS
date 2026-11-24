@@ -48,6 +48,7 @@ def main():
     parser.add_argument('--half-width',type=float,default=.45)
     parser.add_argument('--min-z',type=float,default=-.20)
     parser.add_argument('--max-z',type=float,default=.80)
+    parser.add_argument('--lidar-source', choices=('unitree', 'hap'), default='unitree')
     args=parser.parse_args()
     if args.output.exists():parser.error('Refusing to overwrite a report')
     if not 1<=args.seconds<=60 or min(args.half_depth,args.half_width)<=0:
@@ -56,7 +57,8 @@ def main():
     buffer=Buffer();listener=TransformListener(buffer,node)
     recent={};rows=defaultdict(list);faults=defaultdict(int);map_data={}
     latched=QoSProfile(depth=1,durability=DurabilityPolicy.TRANSIENT_LOCAL)
-    clouds=('/livox/lidar','/cloud_registered_body','/safety/remembered_obstacles')
+    raw_topic = '/utlidar/cloud' if args.lidar_source == 'unitree' else '/livox/lidar'
+    clouds=(raw_topic,'/cloud_registered_body','/safety/remembered_obstacles')
     scans=('/scan_safety','/scan')
     maps=('/traversability/local','/safety/navigation_local','/safety/navigation_global',
           '/local_costmap/costmap','/global_costmap/costmap')
@@ -90,9 +92,14 @@ def main():
             try:
                 if topic in clouds:
                     p=xyz(m)
-                    if topic=='/livox/lidar':
+                    if topic==raw_topic:
                         p=p[np.linalg.norm(p,axis=1)>1.e-4]  # Invalid zero returns are not objects at the sensor origin.
-                    if m.header.frame_id!='base_link':
+                    if topic=='/utlidar/cloud':
+                        from go2_perception.unitree_cloud import ROTATION, TRANSLATION
+                        if m.header.frame_id != 'utlidar_lidar':
+                            raise ValueError('Unexpected native LiDAR frame')
+                        p=p @ ROTATION.T + TRANSLATION
+                    elif m.header.frame_id!='base_link':
                         p=transform(p,buffer.lookup_transform('base_link',m.header.frame_id,Time()))
                     p=p[region(p)]
                     elevated=p[(p[:,2]>=args.min_z)&(p[:,2]<=args.max_z)]

@@ -48,6 +48,8 @@ TEST(GaitCandidates, RejectsCreepingArcsBeforeSimulationWithoutRemovingRealTurns
   int count = 0;
   bool left = false, right = false, forward = false;
   bool minimum_arc_left = false, minimum_arc_right = false;
+  bool boundary_left = false, boundary_right = false;
+  bool tight_turn_left = false, tight_turn_right = false;
   while (gait->hasMoreTwists()) {
     const auto v = gait->nextTwist();
     ++count;
@@ -55,13 +57,19 @@ TEST(GaitCandidates, RejectsCreepingArcsBeforeSimulationWithoutRemovingRealTurns
     left |= v.x < 1.e-5 && v.theta >= .55;
     right |= v.x < 1.e-5 && v.theta <= -.55;
     forward |= v.x >= .22 && std::abs(v.theta) < 1.e-5;
+    boundary_left |= std::abs(v.x-.22)<1.e-5 && std::abs(v.theta-.65)<1.e-5;
+    boundary_right |= std::abs(v.x-.22)<1.e-5 && std::abs(v.theta+.65)<1.e-5;
     minimum_arc_left |= std::abs(v.x-.22)<1.e-5 && v.theta>.1 && v.theta<.65;
     minimum_arc_right |= std::abs(v.x-.22)<1.e-5 && v.theta<-.1 && v.theta>-.65;
+    tight_turn_left |= std::abs(v.x)<1.e-5 && v.theta>=.55 && v.theta<.56;
+    tight_turn_right |= std::abs(v.x)<1.e-5 && v.theta<=-.55 && v.theta>-.56;
   }
   EXPECT_TRUE(left); EXPECT_TRUE(right); EXPECT_TRUE(forward);
   EXPECT_TRUE(minimum_arc_left); EXPECT_TRUE(minimum_arc_right);
+  EXPECT_TRUE(boundary_left); EXPECT_TRUE(boundary_right);
+  EXPECT_TRUE(tight_turn_left); EXPECT_TRUE(tight_turn_right);
   // Boundary samples add bounded work; the old test assumed pruning only.
-  EXPECT_GT(count, 0); EXPECT_LE(count, baseline + 3 * 25);
+  EXPECT_GT(count, 0); EXPECT_LE(count, baseline + 3 * 11 + 6);
   std::cout << "Gait candidates " << count << " versus " << baseline << std::endl;
   gait->setSpeedLimit(.23, false);
   gait->startNewIteration(stopped);

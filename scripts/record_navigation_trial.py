@@ -13,7 +13,7 @@ import rclpy
 from action_msgs.msg import GoalStatusArray
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry, Path as NavPath
-from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy, qos_profile_sensor_data
+from rclpy.qos import DurabilityPolicy, QoSProfile, qos_profile_sensor_data
 from sensor_msgs.msg import Imu,LaserScan,PointCloud2
 from tf2_msgs.msg import TFMessage
 from std_msgs.msg import Bool, String
@@ -32,6 +32,7 @@ def main():
                         help='After goal acceptance, save 5 Hz sampled raw XYZ within 3 m to a sidecar NPZ')
     parser.add_argument('--capture-without-goal',action='store_true',
                         help='Start raw capture immediately and stop at duration, for manual stationary/turn trials')
+    parser.add_argument('--lidar-source', choices=('unitree', 'hap'), default='unitree')
     args = parser.parse_args()
     if args.output.exists():
         parser.error('Refusing to overwrite an existing trial')
@@ -45,6 +46,8 @@ def main():
     raw_arrays={}
     raw_subscription=[None]
     last_raw=[-math.inf]
+    raw_topic = '/utlidar/cloud' if args.lidar_source == 'unitree' else '/livox/lidar'
+    imu_topic = '/utlidar/imu' if args.lidar_source == 'unitree' else '/livox/imu'
 
     def elapsed():
         return time.monotonic()-began
@@ -57,7 +60,7 @@ def main():
             if entry.status in (1, 2, 3) and state['first'] is None:
                 state['first'] = elapsed()
                 if args.raw_clouds and raw_subscription[0] is None:
-                    raw_subscription[0]=node.create_subscription(PointCloud2,'/livox/lidar',
+                    raw_subscription[0]=node.create_subscription(PointCloud2,raw_topic,
                         raw_cloud,qos_profile_sensor_data)
                 print('User-issued goal observed: '+key, flush=True)
             if state['goals'].get(key) != entry.status:
@@ -84,13 +87,14 @@ def main():
         state['odom_frames'] = [m.header.frame_id, m.child_frame_id]
 
     node.create_subscription(Odometry, '/odom', odom, qos_profile_sensor_data)
-    node.create_subscription(Imu,'/livox/imu',lambda m:
+    node.create_subscription(Imu,imu_topic,lambda m:
         history['imu_timestamps'].append([elapsed(),
             m.header.stamp.sec+m.header.stamp.nanosec/1.e9,
-            node.get_clock().now().nanoseconds/1.e9-m.header.stamp.sec-m.header.stamp.nanosec/1.e9,
+            (None if args.lidar_source == 'unitree' else
+             node.get_clock().now().nanoseconds/1.e9-m.header.stamp.sec-m.header.stamp.nanosec/1.e9),
             m.linear_acceleration.x,m.linear_acceleration.y,m.linear_acceleration.z,
             m.angular_velocity.x,m.angular_velocity.y,m.angular_velocity.z]),
-        QoSProfile(depth=2000,reliability=ReliabilityPolicy.RELIABLE))
+        qos_profile_sensor_data)
     node.create_subscription(SportModeState, '/lf/sportmodestate', lambda m:
         history['sport'].append([elapsed(), *map(float,m.velocity), float(m.yaw_speed),
                                 int(m.mode), int(m.gait_type), int(m.error_code),
@@ -177,7 +181,7 @@ def main():
                     p.x,p.y,p.z,q.x,q.y,q.z,q.w])
     node.create_subscription(TFMessage, '/tf', map_transform, qos_profile_sensor_data)
     if args.raw_clouds and args.capture_without_goal:
-        raw_subscription[0]=node.create_subscription(PointCloud2,'/livox/lidar',raw_cloud,qos_profile_sensor_data)
+        raw_subscription[0]=node.create_subscription(PointCloud2,raw_topic,raw_cloud,qos_profile_sensor_data)
     for sig in (signal.SIGINT, signal.SIGTERM):
         signal.signal(sig, lambda *_: state.update(stop=True))
     print('Read-only recorder ready; no goals or motion commands published', flush=True)
@@ -194,7 +198,8 @@ def main():
                 break
     finally:
         result = {'goal_seen':state['first'] is not None, 'state':state,
-                  'duration':elapsed(), 'history':dict(history)}
+                  'duration':elapsed(), 'history':dict(history), 'lidar_source':args.lidar_source,
+                  'raw_stamp_domain':'device' if args.lidar_source == 'unitree' else 'host'}
         args.output.parent.mkdir(parents=True, exist_ok=True)
         if raw_arrays:
             sidecar=args.output.with_suffix('.raw.npz')

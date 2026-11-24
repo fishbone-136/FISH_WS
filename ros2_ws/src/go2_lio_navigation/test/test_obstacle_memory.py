@@ -11,6 +11,13 @@ import numpy as np
 
 
 class ObstacleMemoryTests(unittest.TestCase):
+    def test_near_sensor_returns_can_support_obstacle_history(self):
+        # A real return 6 cm ahead of HAP must not disappear behind the old
+        # 25 cm ray-evidence cutoff; the sensor origin itself is not a return.
+        rays = RayEvidence([[.14, 0., .13], [.20, 0., .20]], [.14, 0., .13])
+        self.assertEqual(len(rays.points), 1)
+        np.testing.assert_allclose(rays.points[0], [.20, 0., .20])
+
     def test_near_history_uses_real_crossing_rays_without_return_range_cutoff(self):
         origin=[.14,0.,.13]
         far=RayEvidence([[3.,0.,-.37]],origin)
@@ -61,6 +68,14 @@ class ObstacleMemoryTests(unittest.TestCase):
         self.assertFalse(occluded.clears(1.,0.,.20,.30))
         self.assertFalse(occluded.clears_many([[1.,0.]],[.2],[.3])[0])
 
+    def test_angular_prefilter_keeps_support_beside_ray_and_across_angle_wrap(self):
+        rays = RayEvidence([[1., .023, .25], [-1., .012, .25], [3., 0., .25]],
+                           [0., 0., .25])
+        free, support = rays.classify_many([[1., 0.], [-1., -.01], [0., 1.]],
+                                           [.20] * 3, [.30] * 3)
+        np.testing.assert_array_equal(support, [True, True, False])
+        np.testing.assert_array_equal(free, [False, False, False])
+
     def test_shared_reference_clearance_never_includes_the_floor(self):
         rows=[[1.,0.,10.,None,0,-.395,-.345],[1.,0.,10.,None,0,-.26,.30]]
         volumes=reference_clear_volumes(rows,[0.,0.,1.,.37])
@@ -72,11 +87,12 @@ class ObstacleMemoryTests(unittest.TestCase):
         m=ObstacleMemory();m.mark_xyz([[1.,0.,.2],[2.,0.,.2]],(0.,0.,0.),10.)
         snapshot=m.cells.copy();keys=list(snapshot)
         m.mark_xyz([[2.,0.,.3]],(0.,0.,0.),11.)
-        removed=[]
+        removed,removed_keys=[],[]
         count=m.merge_delta(snapshot,keys,[0,1],[[np.nan,8],[np.nan,8]],
-                            [True,True],10.5,cleared_cells=removed)
+                            [True,True],10.5,cleared_cells=removed,cleared_keys=removed_keys)
         self.assertEqual(count,1);self.assertEqual(len(removed),1)
         self.assertEqual(removed[0][:2],(1.,0.))
+        self.assertEqual(removed_keys,[keys[0]])
         self.assertIn((2.,0.),m.points())
 
     def test_genuine_geometry_never_records_artificial_scan_spread_inside_the_footprint(self):

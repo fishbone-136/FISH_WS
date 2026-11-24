@@ -33,7 +33,7 @@ try:
     from rclpy.duration import Duration
     from rclpy.executors import SingleThreadedExecutor
     from rclpy.node import Node
-    from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
+    from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy, qos_profile_sensor_data
     from rclpy.time import Time
     from tf2_ros import Buffer, TransformListener
     from std_srvs.srv import Trigger
@@ -95,6 +95,9 @@ class RosNavigationWorker(QThread):
         self._map_payload = None
         self._last_odom_pose = None
         self._localization_valid = None
+        self._navigation_motion_enabled = None
+        self._motion_diagnostics = {}
+        self._motion_diagnostics_at = -math.inf
         self._fault_message = ''
         self._fault_seen_at = 0.
         self._lifecycle_state = 0
@@ -204,6 +207,12 @@ class RosNavigationWorker(QThread):
         self._state_client = self._node.create_client(GetState, '/bt_navigator/get_state')
         self._node.create_subscription(Bool, '/lio/localization_valid',
             lambda m: setattr(self, '_localization_valid', m.data), map_qos)
+        self._node.create_subscription(Bool, '/go2/navigation_motion_enabled',
+            lambda m: setattr(self, '_navigation_motion_enabled', m.data), map_qos)
+        self._node.create_subscription(String, '/unitree/navigation_source/status',
+            self._on_unitree_source_status, map_qos)
+        self._node.create_subscription(String, '/safety/motion_diagnostics',
+            self._on_motion_diagnostics, qos_profile_sensor_data)
         self._node.create_subscription(String, '/safety/navigation_fault', self._on_fault, map_qos)
         self._node.create_subscription(GoalStatusArray, '/navigate_to_pose/_action/status',
             lambda m: setattr(self, '_external_goal_active',
@@ -285,7 +294,8 @@ class RosNavigationWorker(QThread):
 
     def _visual_preflight(self, request_id):
         try:
-            if (self._operator_stopped or self._control_future is not None or self._lifecycle_state != 3
+            if (self._navigation_motion_enabled is False or self._operator_stopped or
+                    self._control_future is not None or self._lifecycle_state != 3
                     or self._localization_valid is not True or self._fault_active()
                     or time.monotonic()-self._map_pose_seen_at > 2.):
                 raise ValueError('导航或有效定位未就绪，未执行移动。')
@@ -309,7 +319,8 @@ class RosNavigationWorker(QThread):
                    for items in self._behavior_status.values() for identity, status in items)
 
     def _relative_preflight(self, owned=False):
-        if (self._operator_stopped or self._control_future is not None or self._lifecycle_state != 3
+        if (self._navigation_motion_enabled is False or self._operator_stopped or
+                self._control_future is not None or self._lifecycle_state != 3
                 or time.monotonic()-self._lifecycle_seen_at > 4. or self._localization_valid is not True
                 or self._fault_active() or time.monotonic()-self._map_pose_seen_at > 2.):
             raise ValueError('导航、定位或位姿未就绪，未继续相对动作。')
@@ -560,11 +571,18 @@ class RosNavigationWorker(QThread):
             self.goal_finished.emit(False, message)
             if owner:
                 self.visual_goal_updated.emit(owner, 'rejected', message)
+        if self._navigation_motion_enabled is False:
+            reject('当前会话为地图预览，底盘控制已关闭')
+            return
         if self._operator_stopped or self._control_future is not None or self._lifecycle_state != 3:
             reject('导航尚未启用，请先启动 / 恢复导航')
             return
         if self._localization_valid is not True or self._fault_active():
             reject('定位尚未有效或已故障，未发送导航目标')
+            return
+        warning = self._motion_safety_warning(time.monotonic())
+        if warning and (self._navigation_motion_enabled is True or self._motion_diagnostics):
+            reject(warning)
             return
         if not self._navigator.server_is_ready():
             reject("Nav2 navigate_to_pose 尚未就绪")
@@ -681,6 +699,10 @@ class RosNavigationWorker(QThread):
                 GoalStatus.STATUS_ABORTED: (False, "导航失败/中止"),
             }
             success, text = labels.get(status, (False, f"导航结束，状态码 {status}"))
+            if status == GoalStatus.STATUS_ABORTED:
+                warning = self._motion_safety_warning(time.monotonic())
+                if warning and self._motion_diagnostics:
+                    text += ' · ' + warning
             self.goal_finished.emit(success, text)
             if owner:
                 self.visual_goal_updated.emit(owner, 'succeeded' if success else 'finished', text)
@@ -743,10 +765,49 @@ class RosNavigationWorker(QThread):
     def _on_fault(self, message):
         try:
             payload = json.loads(message.data)
-            self._fault_message = payload.get('message', 'FAST-LIO 定位已停止，需重启导航进程')
+            self._fault_message = payload.get('message', '定位已停止，需重启导航进程')
         except (ValueError, TypeError):
             self._fault_message = message.data
         self._fault_seen_at = time.monotonic()
+
+    def _on_unitree_source_status(self, message):
+        try:
+            fault = json.loads(message.data).get('fault')
+        except (TypeError, ValueError, AttributeError):
+            return
+        if fault:
+            self._fault_message = f'本体雷达时钟异常，需重启导航进程（{fault}）'
+            self._fault_seen_at = time.monotonic()
+
+    def _on_motion_diagnostics(self, message):
+        try:
+            data = json.loads(message.data)
+        except (TypeError, ValueError):
+            return
+        if not isinstance(data, dict):
+            return
+        self._motion_diagnostics = data
+        self._motion_diagnostics_at = time.monotonic()
+
+    def _motion_safety_warning(self, now):
+        if self._navigation_motion_enabled is False:
+            return '地图预览，底盘控制已关闭'
+        data = self._motion_diagnostics
+        if now - self._motion_diagnostics_at > 1.5:
+            return '等待实时安全检测数据'
+        if data.get('unitree_required') is True and data.get('unitree_reason') != 'none':
+            return '本体雷达近身保护未就绪'
+        for field, warning in (
+            ('scan_valid', '实时雷达扫描未就绪'),
+            ('footprint_valid', '机身保护轮廓未就绪'),
+            ('memory_valid', '障碍记忆未就绪'),
+            ('raw_lidar_valid', '近身雷达保护未就绪'),
+            ('hard_zone_clear', '机身保护区内有占用，已拦停'),
+            ('turn_clear', '当前运动方向受阻'),
+        ):
+            if data.get(field) is not True:
+                return warning
+        return ''
 
     def _fault_active(self):
         return bool(self._fault_message and
@@ -759,6 +820,9 @@ class RosNavigationWorker(QThread):
         if operation == 'pause':
             self._operator_stopped = True
             self._cancel_goal()
+        elif self._navigation_motion_enabled is False:
+            self.control_finished.emit(operation, False, '地图预览会话的底盘控制已关闭')
+            return
         elif (self._localization_valid is not True or self._fault_active() or
               time.monotonic()-self._map_pose_seen_at > 3.):
             self._control_error = '定位无效或已超时，不能恢复；请检查定位日志'
@@ -866,6 +930,8 @@ class RosNavigationWorker(QThread):
             state, text = 'waiting', '正在停止导航…' if self._control_operation == 'pause' else '正在恢复导航…'
         elif self._control_error:
             state, text = 'error', self._control_error
+        elif self._navigation_motion_enabled is False and map_ok and pose_ok:
+            state, text = 'preview', '地图预览运行中 · 底盘控制已关闭'
         elif paused or self._operator_stopped:
             state, text = 'paused', '导航已停止；定位和地图仍可查看'
         elif nav_ready and active and map_ok and pose_ok and self._localization_valid is True:
@@ -890,12 +956,15 @@ class RosNavigationWorker(QThread):
         except Exception as error:
             camera_error=str(error)
         capabilities = {'online': True, 'can_control': self._lifecycle_client.service_is_ready(),
+            'lidar_source': self._motion_diagnostics.get('lidar_source'),
+            'motion_safety_warning': self._motion_safety_warning(now),
             'camera_calibrated': not camera_error, 'camera_error': camera_error,
             'paused': paused or self._operator_stopped,
             'can_save': map_ok and self._environment_save_client.service_is_ready(),
             'goal_active': (self._external_goal_active or self._goal_request_pending or self._goal_handle is not None
                             or self._relative_busy() or self._capture_pending is not None or self._behavior_busy()),
-            'relative_ready': bool(self._relative_executor is not None and
+            'relative_ready': bool(self._navigation_motion_enabled is not False and
+                self._relative_executor is not None and
                 all(client.server_is_ready() for client in self._relative_executor.clients.values())),
             'save_busy': self._save_future is not None}
         if capabilities != self._last_capabilities:

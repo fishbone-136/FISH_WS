@@ -89,6 +89,7 @@ PointCloudToLaserScanNode::PointCloudToLaserScanNode(const rclcpp::NodeOptions &
   inf_epsilon_ = this->declare_parameter("inf_epsilon", 1.0);
   use_inf_ = this->declare_parameter("use_inf", true);
   ground_filter_enabled_ = this->declare_parameter("ground_filter_enabled", false);
+  require_ground_for_scan_ = this->declare_parameter("require_ground_for_scan", false);
   observed_free_space_only_ = this->declare_parameter("observed_free_space_only", false);
   ground_clearance_ = this->declare_parameter("ground_clearance", 0.10);
   obstacle_height_ = this->declare_parameter("obstacle_height_above_ground", 1.3);
@@ -132,6 +133,18 @@ PointCloudToLaserScanNode::PointCloudToLaserScanNode(const rclcpp::NodeOptions &
   obstacle_points_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
     "obstacle_points", qos);
   ground_plane_pub_=create_publisher<geometry_msgs::msg::PoseStamped>("ground_plane",qos);
+  const auto scan_mirror = declare_parameter<std::string>("scan_mirror_topic", "");
+  const auto obstacle_mirror = declare_parameter<std::string>("obstacle_mirror_topic", "");
+  const auto ground_mirror = declare_parameter<std::string>("ground_mirror_topic", "");
+  if (!scan_mirror.empty()) {
+    scan_mirror_ = create_publisher<sensor_msgs::msg::LaserScan>(scan_mirror, qos);
+  }
+  if (!obstacle_mirror.empty()) {
+    obstacle_mirror_ = create_publisher<sensor_msgs::msg::PointCloud2>(obstacle_mirror, qos);
+  }
+  if (!ground_mirror.empty()) {
+    ground_mirror_ = create_publisher<geometry_msgs::msg::PoseStamped>(ground_mirror, qos);
+  }
   const auto pose_topic=declare_parameter<std::string>("ground_pose_topic","");
   if (level_scan_ && (target_frame_.empty() || pose_topic.empty())) {
     throw std::invalid_argument("Levelled scan requires target_frame and ground_pose_topic");
@@ -275,10 +288,7 @@ void PointCloudToLaserScanNode::cloudCallback(
             // publish a ground plane, or turn these returns into free rays.
             const auto reference=transform_ground(
               local_world_ground_,rotation.transpose(),-rotation.transpose()*translation);
-            const double floor_z=-reference.offset/reference.normal.z();
-            if (reference.normal.allFinite() && reference.normal.z()>=.9063 &&
-              std::isfinite(floor_z) && floor_z>=-1.4 && floor_z<=-.12)
-            {ground=reference;}
+            if (is_body_ground(reference)) {ground=reference;}
           }
         }
       } catch(const std::exception &) {
@@ -306,8 +316,11 @@ void PointCloudToLaserScanNode::cloudCallback(
       plane.pose.orientation.x=q.x();plane.pose.orientation.y=q.y();
       plane.pose.orientation.z=q.z();plane.pose.orientation.w=q.w();
       ground_plane_pub_->publish(plane);
+      if (ground_mirror_ && ground_mirror_->get_subscription_count()) {
+        ground_mirror_->publish(plane);
+      }
     }
-    if (!ground_observation_supported) {
+    if (!ground_observation_supported && have_ground) {
       RCLCPP_WARN_THROTTLE(
         get_logger(), *get_clock(), 3000,
         "No measured ground: fresh positive-only obstacle observations; clearing withheld");
@@ -324,12 +337,16 @@ void PointCloudToLaserScanNode::cloudCallback(
   // Ground returns provide observed-ray evidence without becoming obstacles.
   // No-return angular bins (including the rear HAP blind sector) stay NaN.
   // Iterate through pointcloud
-  const bool collect_obstacles = obstacle_points_pub_->get_subscription_count() > 0;
+  const bool positive_only = ground_filter_enabled_ && !ground_observation_supported;
+  const bool unclassified = positive_only && !have_ground;
+  const bool withhold_scan = unclassified && require_ground_for_scan_;
+  const bool collect_obstacles = obstacle_points_pub_->get_subscription_count() > 0 ||
+    (obstacle_mirror_ && obstacle_mirror_->get_subscription_count() > 0);
   std::vector<std::array<float, 3>> observed_obstacles;
-  if (collect_obstacles) {observed_obstacles.reserve(cloud_msg->width);}
+  if (collect_obstacles && !unclassified) {observed_obstacles.reserve(cloud_msg->width);}
   for (sensor_msgs::PointCloud2ConstIterator<float> iter_x(*cloud_msg, "x"),
     iter_y(*cloud_msg, "y"), iter_z(*cloud_msg, "z");
-    iter_x != iter_x.end(); ++iter_x, ++iter_y, ++iter_z)
+    !withhold_scan && iter_x != iter_x.end(); ++iter_x, ++iter_y, ++iter_z)
   {
     if (std::isnan(*iter_x) || std::isnan(*iter_y) || std::isnan(*iter_z)) {
       RCLCPP_DEBUG(
@@ -342,8 +359,11 @@ void PointCloudToLaserScanNode::cloudCallback(
     if (!std::isfinite(*iter_x) || !std::isfinite(*iter_y) || !std::isfinite(*iter_z)) {
       continue;
     }
-    if (ground_filter_enabled_ && std::abs(*iter_x) < 0.40 && std::abs(*iter_y) < 0.24) {
-      continue;  // self returns inside the padded standing footprint
+    if (ground_filter_enabled_ && *iter_x > -0.40 && *iter_x < 0.19 &&
+      std::abs(*iter_y) < 0.24)
+    {
+      // HAP origin is x=0.14 m: retain observations 5 cm ahead of the sensor.
+      continue;  // rear and side self-return exclusion remains unchanged
     }
     if (!ground_filter_enabled_ && (*iter_z > max_height_ || *iter_z < min_height_)) {
       RCLCPP_DEBUG(
@@ -400,7 +420,9 @@ void PointCloudToLaserScanNode::cloudCallback(
       if (std::isnan(scan_msg->ranges[index]) || range < scan_msg->ranges[index]) {
         scan_msg->ranges[index] = range;
       }
-      if (collect_obstacles) {observed_obstacles.push_back({*iter_x, *iter_y, *iter_z});}
+      if (collect_obstacles && !unclassified) {
+        observed_obstacles.push_back({*iter_x, *iter_y, *iter_z});
+      }
     }
   }
 
@@ -413,33 +435,45 @@ void PointCloudToLaserScanNode::cloudCallback(
     observations.is_dense = true;
     sensor_msgs::PointCloud2Modifier modifier(observations);
     modifier.setPointCloud2FieldsByString(1, "xyz");
-    const bool positive_only=ground_filter_enabled_ && !ground_observation_supported;
     if (positive_only) {
       // xyz uses a 16-byte layout; its padding byte can carry this mode flag
       // without changing genuine XYZ, acquisition stamp, or point stride.
       sensor_msgs::msg::PointField flag;
-      flag.name="positive_only";flag.offset=12;
+      // Without an accepted plane these returns may include floor and
+      // overhead points. Keep the frame stamp for pairing with raw beams.
+      flag.name = unclassified ? "unclassified" : "positive_only";
+      flag.offset = 12;
       flag.datatype=sensor_msgs::msg::PointField::UINT8;flag.count=1;
       observations.fields.push_back(flag);
     }
     modifier.resize(observed_obstacles.size());
-    if (positive_only) {
+    if (positive_only && !unclassified) {
       for (std::size_t i=0;i<observed_obstacles.size();++i) {
         observations.data[i*observations.point_step+12]=1;
       }
     }
-    sensor_msgs::PointCloud2Iterator<float> x(observations, "x");
-    sensor_msgs::PointCloud2Iterator<float> y(observations, "y");
-    sensor_msgs::PointCloud2Iterator<float> z(observations, "z");
-    for (const auto & point : observed_obstacles) {
-      *x = point[0];
-      *y = point[1];
-      *z = point[2];
-      ++x;
-      ++y;
-      ++z;
+    if (!observed_obstacles.empty()) {
+      sensor_msgs::PointCloud2Iterator<float> x(observations, "x");
+      sensor_msgs::PointCloud2Iterator<float> y(observations, "y");
+      sensor_msgs::PointCloud2Iterator<float> z(observations, "z");
+      for (const auto & point : observed_obstacles) {
+        *x = point[0];
+        *y = point[1];
+        *z = point[2];
+        ++x;
+        ++y;
+        ++z;
+      }
     }
     obstacle_points_pub_->publish(observations);
+    if (obstacle_mirror_ && obstacle_mirror_->get_subscription_count()) {
+      obstacle_mirror_->publish(observations);
+    }
+  }
+  if (withhold_scan) {
+    RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 3000,
+      "No usable ground reference; withholding navigation scan");
+    return;
   }
 
   const auto is_obstacle_range = [this](float range) {
@@ -499,6 +533,9 @@ void PointCloudToLaserScanNode::cloudCallback(
     }
   }
 
+  if (scan_mirror_) {
+    scan_mirror_->publish(*scan_msg);
+  }
   pub_->publish(std::move(scan_msg));
 }
 

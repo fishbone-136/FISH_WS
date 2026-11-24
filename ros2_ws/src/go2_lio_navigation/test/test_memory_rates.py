@@ -13,7 +13,7 @@ os.environ['CYCLONEDDS_URI']=(
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'scripts'))
 import rclpy
 from rclpy.parameter import Parameter
-from obstacle_memory import RememberedObstacles
+from obstacle_memory import MAP_POLL_INTERVAL, RememberedObstacles
 
 
 class MemoryRateTests(unittest.TestCase):
@@ -35,7 +35,8 @@ class MemoryRateTests(unittest.TestCase):
             Parameter('navigation_publish_rate',value=12.),Parameter('clearing_rate',value=8.)])
         self.assertTrue(result.successful)
         self.assertEqual(node.memory_timer.timer_period_ns,50000000)
-        self.assertEqual(node.maps_timer.timer_period_ns,int(1.e9/12.))
+        self.assertEqual(node.maps_timer.timer_period_ns,int(1.e9*MAP_POLL_INTERVAL))
+        self.assertEqual(node.navigation_publish_rate,12.)
         self.assertEqual(node.clearing_rate,8.)
         self.assertEqual(node.memory.cells,before)
 

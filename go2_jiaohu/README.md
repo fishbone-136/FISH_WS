@@ -11,31 +11,34 @@
 调整窗口。小屏幕上内容区可以滚动。底部提供“首页 / 导航”两个入口；导航页首次打开时
 才创建显示桥接线程，并嵌入当前 LIO 导航的完整 RViz 窗口。
 
-导航已经运行时，从工作区根目录执行以下命令，再点击底部“导航”即可接入：
+从工作区根目录运行界面，再点击底部“导航”。启动本机导航前请先让机器狗站稳。
 
 ```bash
 cd /home/fishbone/FISH_ws
 QT_QPA_PLATFORM=xcb bash scripts/run_ui.sh
 ```
 
-默认“接入已运行的当前导航”模式只连接现有节点，不启动第二套导航。RViz直接读取
-当前安装的 `go2_lio_navigation/config/lio_environment.rviz`，包含地图、点云、地形、
-代价地图、路径和原有 Nav2 选点工具，导航代码和参数不由 UI 修改。
-“二维选点”是辅助页，使用 `/safety/navigation_global` 和 `odom_lio` 坐标；
-保存按钮调用当前 `/mapping/save`，保存结果路径显示在日志中。
-
-导航尚未启动时，可选“启动当前 LIO 导航”，再点击“连接 / 启动”。该按钮调用原有
-`scripts/run_lio_navigation.sh`，仅设置 `use_rviz:=false`，由界面内的 RViz负责显示，
-其他导航配置沿用现有入口；缺少历史地形显示节点时由界面补充显示节点，不改变导航输入。
+默认模式优先接入已有导航，否则使用 `scripts/run_lio_navigation.sh`
+启动本体雷达 2.5D 导航。若只想连接已运行的导航，可选“仅连接已有导航”。
+界面内的 RViz 显示地图、点云、地形、代价地图和路径，支持原有 Nav2 选点工具。
+状态区显示雷达来源、近身保护和占用状态。手动坐标目标使用当前地图坐标系，
+实时安全检测就绪后才能提交。保存按钮调用 `/mapping/save`，结果路径显示在日志中。
+“关闭导航”会取消目标并关闭本机导航和底盘控制。关闭完成后可以切回语音或手势，
+也可点击“启动 / 重试”重新启动导航。
 内嵌窗口使用 X11/xcb；Wayland 桌面可通过以上命令使用 XWayland。
 
 点击语音、手势或视觉功能即可启动，切换功能时会先停止上一项；重复点击当前功能
 不会重复启动或关闭。点击「停止当前功能」返回待机。
+「人体跟随」已集成到首页：点击后显示广角灰度预览、人物框、中心线和深度画面；
+右侧切换为跟随控制面板，默认速度上限 **0.35 米/秒**、跟随距离 **1.5 米**。
+检测就绪后点击「开始跟随」才会启动运动；「停止跟随」只停车并保留预览，
+「停止当前功能」退出并恢复彩色相机。切换功能或关闭界面时会先等待跟随控制和
+相机资源退出，不会重复启动运动接口。界面跟随使用原 SDK 算法，不启动 LIO/Nav2。
 手势模式点击后直接启用识别，仍保留 OK 手势切换待机的能力。眼动仪尚未接入，
 对应入口暂不可用。
 
-语音的麦克风发现和模型加载在后台进行；Whisper 就绪后即可监听，不再等待 Qwen、
-Kokoro 和运动接口全部启动。Qwen 同时后台预热；运动接口在实际收到动作口令时连接。
+语音的麦克风发现和模型加载在后台进行；Qwen ASR 就绪后即可监听，不再等待 Ollama、
+Kokoro 和运动接口全部启动。Ollama 同时后台预热；运动接口在实际收到动作口令时连接。
 第一次问答仍可能需要等待模型加载，日志会记录启动到监听的实际耗时。
 
 运行日志保存在 `log/ui_runtime.log`（自动轮转），包含界面交互、录音长度、主模型
@@ -43,7 +46,15 @@ Kokoro 和运动接口全部启动。Qwen 同时后台预热；运动接口在�
 不会保留“正在识别”的假回复。校准门限以实际环境底噪为准，配置的参考上限不会把
 门限压到实际底噪以下；只有 ASR 判定为静音的长时间稳定噪声才用于上调门限。
 
-高精度复核继续使用常驻于 ASR 子进程的 large-v3-turbo，不额外增加第三遍识别。
+默认语音识别使用相邻 `../yuyin` 中的 Qwen3-ASR-0.6B 和 `.venv-qwen`，
+通过独立 Python 进程返回每句最终文字；模型常驻，仅开启语音模式时加载一次。
+不运行 `yuyin/run_asr.sh` 的第二路麦克风采集，现有录音、停顿断句和播报防回声继续生效。
+这次接入不包含终端中的滚动预览；中文为默认语言，`QWEN_ASR_LANGUAGE=auto` 可自动识别语言。
+Qwen 不提供 Whisper 的置信度与静音概率，不执行 Whisper 双模型复核或词表复核。
+空 PCM 会在解码前拒绝；其他识别文本继续经过原有对话和动作门控。
+
+设置 `GO2_ASR_BACKEND=whisper` 可切回原识别器。以下复核及词表设置仅适用于 Whisper：
+高精度复核使用常驻于 ASR 子进程的 large-v3-turbo，不额外增加第三遍识别。
 主模型语言置信度达到 0.80 时，普通对话复核也复用该语言；语言不确定时仍自动判断。
 复核按整句 token 数加权评价置信度，并检查每个片段，避免一个清晰片段掩盖其余乱码。
 复核平均置信度低于 -0.45、任一片段低于 -0.65 或静音概率超过 0.45 时，请用户重说，
@@ -69,7 +80,7 @@ Kokoro 和运动接口全部启动。Qwen 同时后台预热；运动接口在�
 
 ```text
 麦克风
-  → faster-whisper（独立进程，中英文自动识别）
+  → Qwen3-ASR-0.6B（yuyin 独立环境，默认中文，可自动识别语言）
   → 固定安全口令门控
       ├─ 普通聊天 → 本机 Ollama / qwen2.5:3b
       ├─ 授权动作 → Qwen 语义分析 → 关键词/JSON → 白名单/限速/限时
@@ -92,6 +103,12 @@ emergency stop` 属于安全制动，可随时直接说；`一键报警 / 紧急
 raise the alarm` 会先停车再触发报警链路。
 
 ## D435i 视觉引导
+
+独立的人体跟随实验入口：从工作区根目录运行 `bash scripts/run_person_follow.sh`。
+默认预览，空格启动，S/Esc 停止，Q 退出；仅使用 D435i 和 Unitree SDK，不启动
+LIO/Nav2。需要先关闭交互 UI 和其他运动控制程序。
+支持腿部深度前景筛选、距离平滑、单人慢速跟随和异常停车，详见
+[SDK 人体跟随说明](../docs/PERSON_FOLLOW.md)。
 
 语音中明确使用执行口令并要求“沿地面引导线”“识别红绿灯”时，Qwen 只生成
 `visual_guide` 受限动作，实际闭环由本地 OpenCV 和 D435i 完成：
@@ -147,6 +164,11 @@ OLLAMA_HISTORY_MESSAGES=4
 OLLAMA_KEEP_ALIVE=30m
 OLLAMA_WARMUP=1
 OLLAMA_WARMUP_DEPENDENCY_TIMEOUT=30
+GO2_ASR_BACKEND=qwen
+QWEN_ASR_ROOT=../yuyin
+QWEN_ASR_DEVICE=auto
+QWEN_ASR_LANGUAGE=Chinese
+# 以下 WHISPER_* 仅在 GO2_ASR_BACKEND=whisper 时生效。
 WHISPER_MODEL=voice/models/faster-whisper-small
 WHISPER_CPU_FALLBACK_MODEL=voice/models/faster-whisper-small
 WHISPER_DEVICE=cuda
@@ -195,7 +217,16 @@ BANGBANG_ALARM_ROS_TOPIC=/bangbang/emergency_alert
 BANGBANG_ALARM_COMMAND=
 ```
 
-当前部署从 `voice/models/faster-whisper-small` 读取低延迟本地模型，并启用
+默认从上级 `yuyin/Qwen3-ASR-0.6B` 读取 Qwen 语音识别模型，使用
+`yuyin/.venv-qwen/bin/python -I`，隔离 ROS 和用户目录的 Python 包。
+只在识别子进程中添加 `yuyin/.cuda-libs`；这些链接依赖本机现有 CUDA 运行库，搬迁时需一起检查。
+启动、转写均强制离线，模型不会自动下载。自动设备模式沿用 `yuyin/cuda_probe.py`
+进行真实 CUDA 运算检查，失败时回退 CPU；显式 `QWEN_ASR_DEVICE=cuda:0` 则报错。
+CPU 识别可能较慢；GPU 模式与 Kokoro、人物检测和 Ollama 共用显存，需实机验证延迟和余量。
+环境已就绪时无需重新运行依赖安装脚本，也不要把根目录 `requirements.txt` 装进 ROS/UI 环境。
+缺少独立环境或模型时会明确报错，不自动切换到旧模型。
+
+仅在 `GO2_ASR_BACKEND=whisper` 时，从 `voice/models/faster-whisper-small` 读取本地模型，并启用
 `WHISPER_LOCAL_FILES_ONLY=1`，启动时不会访问 Hugging Face，也不受系统代理影响。
 Jetson AGX Orin 使用工作区 `third_party` 中的 CUDA 12.6 运行库和按 sm_87 编译的
 CTranslate2 4.8.2，正常启动日志应显示 `cuda / float16`。模型只在开启语音交互时
@@ -230,7 +261,7 @@ SDK 参数，复杂表达采用 Qwen 的 JSON 动作。两种结果都必须经�
 麦克风使用兼顾灵敏度与削波余量的 80%，静态触发门限为 200，并要求至少
 0.45 秒连续语音；输出使用 160% 系统增益、85% 独立硬件播放级与
 Kokoro 软限幅响度增强。邦邦播报期间会临时静音麦克风并在恢复
-监听前清空缓冲，防止扬声器回声触发自问自答。`字幕by索兰娅` 等已知 Whisper
+监听前清空缓冲，防止扬声器回声触发自问自答。切回 Whisper 时，`字幕by索兰娅` 等已知
 片尾幻觉会被精确裁掉而保留前面的真实口令；解码阶段启用重复惩罚和三元组去重，
 并在安全门前拒绝热词提示回显与短语循环。运动热词提示默认关闭，避免底噪被转写成
 整套动作词。繁体控制字形和句首“包包/帮帮”等名称误识别也会在门控前归一化。

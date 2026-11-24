@@ -10,13 +10,15 @@ import cv2
 import numpy as np
 
 
-def decode_people(output, width, height, scale, pad):
+def decode_people(output, width, height, scale, pad, confidence=.55):
+    if not np.isfinite(confidence) or not .25 <= confidence <= .90:
+        raise ValueError('无效的人物检测阈值')
     rows = np.asarray(output).squeeze()
     if rows.ndim != 2 or rows.shape[0] != 84 or not np.isfinite(rows).all():
         raise ValueError('不支持的人物模型输出')
     rows = rows.T
     scores = rows[:, 4:]
-    mask = (scores.argmax(axis=1) == 0) & (scores[:, 0] >= .55)
+    mask = (scores.argmax(axis=1) == 0) & (scores[:, 0] >= confidence)
     rows = rows[mask]
     boxes, confidences = [], []
     for row in rows:
@@ -24,7 +26,7 @@ def decode_people(output, width, height, scale, pad):
         x, y = (cx-w/2-pad[0])/scale, (cy-h/2-pad[1])/scale
         boxes.append([float(x), float(y), float(w/scale), float(h/scale)])
         confidences.append(float(row[4]))
-    indices = cv2.dnn.NMSBoxes(boxes, confidences, .55, .45)
+    indices = cv2.dnn.NMSBoxes(boxes, confidences, confidence, .45)
     result = []
     for index in np.asarray(indices).flatten():
         x, y, w, h = boxes[int(index)]
@@ -64,7 +66,8 @@ def main():
             tensor = torch.from_numpy(np.ascontiguousarray(padded[:, :, ::-1].transpose(2, 0, 1))).to('cuda').half().unsqueeze(0)/255.
             with torch.inference_mode():
                 output = model(tensor)[0].float().cpu().numpy()
-            boxes = decode_people(output, width, height, scale, (left, top))
+            boxes = decode_people(output, width, height, scale, (left, top),
+                                  float(payload.get('confidence', .55)))
             print(json.dumps({'boxes': boxes, 'seconds': time.monotonic()-started}), flush=True)
         except Exception as error:
             print(json.dumps({'error': str(error)}), flush=True)

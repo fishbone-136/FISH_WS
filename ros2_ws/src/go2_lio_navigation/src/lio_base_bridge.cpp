@@ -184,7 +184,7 @@ private:
     const rclcpp::Time stamp(input->header.stamp);
     if (stamp.nanoseconds() == 0) {
       RCLCPP_WARN_THROTTLE(
-        get_logger(), *get_clock(), 3000, "Ignoring zero-stamped FAST-LIO odometry");
+        get_logger(), *get_clock(), 3000, "Ignoring zero-stamped localization odometry");
       return;
     }
     const double input_age = (now() - stamp).seconds();
@@ -203,12 +203,12 @@ private:
       }
       RCLCPP_WARN_THROTTLE(
         get_logger(), *get_clock(), 2000,
-        "Rejected FAST-LIO timestamp age %.3f s (limit %.3f s)", input_age, max_input_age_);
+        "Rejected localization timestamp age %.3f s (limit %.3f s)", input_age, max_input_age_);
       return;
     }
     if (last_stamp_.nanoseconds() != 0 && stamp <= last_stamp_) {
       RCLCPP_WARN_THROTTLE(
-        get_logger(), *get_clock(), 3000, "Ignoring non-monotonic FAST-LIO odometry");
+        get_logger(), *get_clock(), 3000, "Ignoring non-monotonic localization odometry");
       return;
     }
 
@@ -266,7 +266,7 @@ private:
           ++consecutive_jump_samples_;
           RCLCPP_WARN(
             get_logger(),
-            "Rejected suspected FAST-LIO jump (%d/%d): planar=%.2f m/s "
+            "Rejected suspected localization jump (%d/%d): planar=%.2f m/s "
             "vertical=%.2f m/s yaw=%.2f rad/s",
             consecutive_jump_samples_, jump_confirmation_samples_,
             planar_speed, vertical_speed, angular_speed);
@@ -276,7 +276,7 @@ private:
           // estimator divergence remains outside the envelope and is latched
           // on consecutive rejected samples without ever reaching Nav2.
           if (consecutive_jump_samples_ >= jump_confirmation_samples_) {
-            latch_fault("consecutive implausible FAST-LIO pose jumps");
+            latch_fault("consecutive implausible localization pose jumps");
           }
           return;
         }
@@ -378,7 +378,7 @@ private:
     {
       if (localization_valid_) {
         RCLCPP_ERROR(
-          get_logger(), "FAST-LIO odometry timed out for more than %.2f s", input_timeout_);
+          get_logger(), "Localization odometry timed out for more than %.2f s", input_timeout_);
       }
       consecutive_good_samples_ = 0;
       publish_valid(false);
@@ -392,7 +392,7 @@ private:
     consecutive_good_samples_ = 0;
     publish_valid(false);
     RCLCPP_FATAL(
-      get_logger(), "Localization safety fault latched: %s; restart FAST-LIO after checking the sensor",
+      get_logger(), "Localization safety fault latched: %s. Check the sensor and restart navigation",
       reason);
   }
 

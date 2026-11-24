@@ -133,6 +133,7 @@ public:
     odom_frame_ = declare_parameter<std::string>("odom_frame", "odom_lio");
     map_frame_ = declare_parameter<std::string>("map_frame", "map");
     base_frame_ = declare_parameter<std::string>("base_frame", "base_link");
+    ray_origin_frame_ = declare_parameter<std::string>("ray_origin_frame", "");
     localization_valid_topic_ = declare_parameter<std::string>(
       "localization_valid_topic", "/lio/localization_valid");
     use_pose_graph_cloud_ = declare_parameter<bool>("use_pose_graph_cloud", false);
@@ -328,7 +329,8 @@ private:
   BuiltGrid build_grid(
     const Cloud & cloud, const std::string & frame, const Eigen::Vector3d & center,
     double length_x, double length_y, int min_points_per_cell,
-    const rclcpp::Time & stamp, const Cloud * raytrace_cloud, bool include_surface=false) const
+    const rclcpp::Time & stamp, const Cloud * raytrace_cloud, bool include_surface=false,
+    const Eigen::Vector3d * ray_origin=nullptr) const
   {
     const int width = std::max(1, static_cast<int>(std::ceil(length_x / resolution_)));
     const int height = std::max(1, static_cast<int>(std::ceil(length_y / resolution_)));
@@ -374,10 +376,11 @@ private:
     // historical keyframe from the robot's current position could clear a ray
     // through an obstacle that was not visible from this pose.
     if (raytrace_free_space_ && raytrace_cloud != nullptr) {
+      const auto & ray_start = ray_origin ? *ray_origin : center;
       const int origin_cell_x = static_cast<int>(
-        std::floor((center.x() - origin_x) / resolution_));
+        std::floor((ray_start.x() - origin_x) / resolution_));
       const int origin_cell_y = static_cast<int>(
-        std::floor((center.y() - origin_y) / resolution_));
+        std::floor((ray_start.y() - origin_y) / resolution_));
       // Thousands of returns often end in the same 10 cm cell. The projected
       // ray is identical: trace it once instead of repeating Bresenham per point.
       std::vector<bool> ray_seen(static_cast<std::size_t>(width * height), false);
@@ -481,6 +484,7 @@ private:
     }
     Cloud::Ptr local_cloud = std::make_shared<Cloud>();
     Cloud::Ptr global_cloud;
+    Cloud::Ptr ray_cloud = local_cloud;
     rclcpp::Time observation_stamp(0,0,get_clock()->get_clock_type());
     {
       std::lock_guard<std::mutex> lock(mutex_);
@@ -491,7 +495,12 @@ private:
         *local_cloud += *entry.cloud;
       }
       global_cloud = global_cloud_;
-      if (!local_history_.empty()) {observation_stamp=local_history_.back().stamp;}
+      if (!local_history_.empty()) {
+        observation_stamp = local_history_.back().stamp;
+        if (!ray_origin_frame_.empty()) {
+          ray_cloud = local_history_.back().cloud;
+        }
+      }
     }
     if (local_cloud->empty()) {
       return;
@@ -505,6 +514,14 @@ private:
     Eigen::Isometry3d map_from_odom;
     if (!lookup(odom_frame_, base_frame_, rclcpp::Time(0), odom_from_base)) {return;}
     const auto stamp = observation_stamp;
+    Eigen::Vector3d ray_origin;
+    const Eigen::Vector3d * ray_start = nullptr;
+    if (!ray_origin_frame_.empty() && raytrace_free_space_) {
+      Eigen::Isometry3d odom_from_sensor;
+      if (!lookup(odom_frame_, ray_origin_frame_, stamp, odom_from_sensor)) {return;}
+      ray_origin = odom_from_sensor.translation();
+      ray_start = &ray_origin;
+    }
     BuiltGrid local,global;
     if (!use_pose_graph_cloud_ && global_min_points_per_cell_==min_points_per_cell_ &&
       global_length_x_>=local_length_x_ && global_length_y_>=local_length_y_)
@@ -513,8 +530,8 @@ private:
       // the continuous odometry frame, then crop. The persistent environment
       // reference remains in map and still follows loop corrections in RViz.
       global=build_grid(*local_cloud,odom_frame_,odom_from_base.translation(),
-        global_length_x_,global_length_y_,min_points_per_cell_,stamp,local_cloud.get(),
-        surface_pub_->get_subscription_count()>0);
+        global_length_x_,global_length_y_,min_points_per_cell_,stamp,ray_cloud.get(),
+        surface_pub_->get_subscription_count()>0,ray_start);
       local.traversability=crop_grid(global.traversability,odom_from_base.translation(),
         local_length_x_,local_length_y_,resolution_);
       local.elevation=crop_grid(global.elevation,odom_from_base.translation(),
@@ -528,13 +545,18 @@ private:
     } else {
       if(!lookup(map_frame_,odom_frame_,rclcpp::Time(0),map_from_odom))return;
       local=build_grid(*local_cloud,odom_frame_,odom_from_base.translation(),
-        local_length_x_,local_length_y_,min_points_per_cell_,stamp,local_cloud.get(),
-        surface_pub_->get_subscription_count()>0);
+        local_length_x_,local_length_y_,min_points_per_cell_,stamp,ray_cloud.get(),
+        surface_pub_->get_subscription_count()>0,ray_start);
       auto map_cloud=std::make_shared<Cloud>();
       if(global_cloud && !global_cloud->empty())*map_cloud+=*global_cloud;
       auto local_in_map=transform_cloud(*local_cloud,map_from_odom);*map_cloud+=*local_in_map;
+      auto map_rays = ray_cloud == local_cloud ? local_in_map : transform_cloud(*ray_cloud, map_from_odom);
+      if (ray_start) {
+        ray_origin = map_from_odom * ray_origin;
+      }
       global=build_grid(*map_cloud,map_frame_,(map_from_odom*odom_from_base).translation(),
-        global_length_x_,global_length_y_,global_min_points_per_cell_,stamp,local_in_map.get());
+        global_length_x_,global_length_y_,global_min_points_per_cell_,stamp,map_rays.get(),
+        false,ray_start);
     }
     local_map_pub_->publish(local.traversability);
     elevation_pub_->publish(local.elevation);
@@ -563,6 +585,7 @@ private:
   std::string odom_frame_;
   std::string map_frame_;
   std::string base_frame_;
+  std::string ray_origin_frame_;
   std::string localization_valid_topic_;
   double update_rate_{3.0};
   double history_seconds_{3.0};

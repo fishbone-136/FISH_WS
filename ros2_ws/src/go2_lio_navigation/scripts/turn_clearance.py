@@ -4,6 +4,9 @@ import math
 import numpy as np
 
 
+MINIMUM_TURN_SPEED = .50
+
+
 def braking_horizon(vx, vy, wz, scan_age=0., reaction=.25,
                     linear_decel=.90, angular_decel=1.50):
     """Equivalent arc time for reaction followed by uniform braking to rest.
@@ -17,15 +20,19 @@ def braking_horizon(vx, vy, wz, scan_age=0., reaction=.25,
 
 
 def braking_speed_scale(points, vx, vy, wz, half_length, half_width, scan_age=0.):
+    # Check the exact gait floor when the next discrete scale would skip it.
+    # A command already below the floor may be an ordinary acceleration ramp.
+    floor = 0.
+    if math.hypot(vx, vy) < .01:
+        floor = MINIMUM_TURN_SPEED / max(MINIMUM_TURN_SPEED, abs(wz))
     for ratio in (1., .85, .70, .55, .40, .25):
+        ratio = max(ratio, floor)
         x, y, angular = ratio*vx, ratio*vy, ratio*wz
-        # Do not manufacture a sustained pure turn below Go2's usable gait
-        # range; the upstream ramp itself may still pass through that range.
-        if ratio < 1. and math.hypot(vx, vy) < .01 and abs(angular) < .50:
-            break
         horizon = braking_horizon(x, y, angular, scan_age)
         if turn_is_clear(points, x, y, angular, half_length, half_width, horizon):
             return ratio
+        if ratio == floor:
+            break
     return 0.
 
 

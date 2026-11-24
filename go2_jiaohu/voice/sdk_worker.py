@@ -7,6 +7,7 @@ import math
 import os
 import select
 import sys
+import threading
 import time
 from typing import Any
 
@@ -35,6 +36,16 @@ def _visual_velocity_spec(payload, now):
             or not .10 <= lease <= .30 or not 0. <= now-issued <= .15 or now >= issued+lease):
         raise ValueError('视觉闭环速度或租约无效/已过期')
     return (vx, 0., wz), issued+lease
+
+
+def _follow_velocity_spec(payload, now):
+    vx,wz,issued,lease = (float(payload[key]) for key in ('vx','wz','issued_at','lease'))
+    if (not all(math.isfinite(v) for v in (vx,wz,issued,lease))
+            or not 0. <= vx <= min(.40,config.MAX_LINEAR_SPEED)
+            or abs(wz) > min(.50,config.MAX_TURN_SPEED)
+            or not .10 <= lease <= .30 or not 0. <= now-issued <= .15 or now >= issued+lease):
+        raise ValueError('跟随速度或租约无效/已过期')
+    return (vx,0.,wz), issued+lease
 
 
 def _motion_spec(
@@ -94,7 +105,43 @@ def _stop_active_motion(client) -> int:
     return stop_code if stop_code != 0 else 0
 
 
-def _run_command_loop(client, input_stream) -> None:
+class _SportStateReader:
+    """Lazily subscribe only when an SDK feedback client requests state."""
+
+    def __init__(self):
+        self._subscribers = []
+        self._lock = threading.Lock()
+        self._state = None
+
+    def _receive(self, message):
+        state = dict(observed_at=time.monotonic(), height=float(message.body_height),
+            rpy=[float(v) for v in message.imu_state.rpy],
+            position=[float(v) for v in message.position],
+            velocity=[float(v) for v in message.velocity], yaw_speed=float(message.yaw_speed))
+        with self._lock:
+            self._state = state
+
+    def get(self):
+        if not self._subscribers:
+            from unitree_sdk2py.core.channel import ChannelSubscriber
+            from unitree_sdk2py.idl.unitree_go.msg.dds_ import SportModeState_
+            # Go2 firmware may expose the high-rate and/or low-frequency stream.
+            for topic in ('rt/sportmodestate', 'rt/lf/sportmodestate'):
+                subscriber = ChannelSubscriber(topic, SportModeState_)
+                self._subscribers.append(subscriber)
+                subscriber.Init(self._receive, 1)
+        with self._lock:
+            state = self._state
+        if state is None or not 0. <= time.monotonic()-state['observed_at'] <= .3:
+            raise ValueError('SDK 姿态反馈未就绪或已过期')
+        return state
+
+    def close(self):
+        for subscriber in self._subscribers:
+            subscriber.Close()
+
+
+def _run_command_loop(client, input_stream, state_reader=None) -> None:
     """运行可抢占动作循环；每条请求都返回首个 SDK API 的结果。"""
     active_motion: tuple[float, float, float] | None = None
     motion_deadline = 0.0
@@ -135,8 +182,15 @@ def _run_command_loop(client, input_stream) -> None:
                     should_exit = True
                     continue
 
-                if control == 'visual_velocity':
-                    motion, deadline = _visual_velocity_spec(payload, time.monotonic())
+                if control == 'read_sport_state':
+                    if state_reader is None:
+                        raise ValueError('SDK 姿态订阅不可用')
+                    _send_status('accepted', request_id=request_id, state=state_reader.get())
+                    continue
+
+                if control in ('visual_velocity','follow_velocity'):
+                    spec = _follow_velocity_spec if control == 'follow_velocity' else _visual_velocity_spec
+                    motion, deadline = spec(payload, time.monotonic())
                     code = _result_code(client.Move(*motion))
                     if code != 0:
                         raise RuntimeError(f'视觉闭环 Move 失败，SDK code={code}')
@@ -200,7 +254,7 @@ def _run_command_loop(client, input_stream) -> None:
                         raise RuntimeError(f"{action} 返回错误，SDK code={code}")
                 _send_status("accepted", request_id=request_id, action=action)
             except Exception as exc:
-                if control == 'visual_velocity' and active_motion is not None:
+                if control in ('visual_velocity','follow_velocity') and active_motion is not None:
                     try:
                         _stop_active_motion(client)
                     finally:
@@ -262,7 +316,11 @@ def main() -> int:
         return 1
 
     _send_status("ready", api_version=api_version, interface=interface)
-    _run_command_loop(client, sys.stdin)
+    state_reader = _SportStateReader()
+    try:
+        _run_command_loop(client, sys.stdin, state_reader)
+    finally:
+        state_reader.close()
     return 0
 
 

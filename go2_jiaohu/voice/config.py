@@ -51,7 +51,22 @@ OLLAMA_WARMUP_DEPENDENCY_TIMEOUT = max(
     0.0, float(os.environ.get("OLLAMA_WARMUP_DEPENDENCY_TIMEOUT", "30"))
 )
 
-# faster-whisper 在独立子进程运行，避免与 ROS 2 / CycloneDDS 的 native 库冲突。
+# Qwen ASR 使用相邻 yuyin 目录的隔离环境，禁止向 ROS/UI 环境安装其依赖。
+ASR_BACKEND = os.environ.get("GO2_ASR_BACKEND", "qwen").strip().lower() or "qwen"
+
+
+def _asr_path(variable: str, default: str) -> str:
+    value = os.path.expanduser(os.environ.get(variable, "").strip() or default)
+    return os.path.abspath(os.path.join(WORKSPACE_DIR, value))
+
+
+QWEN_ASR_ROOT = _asr_path("QWEN_ASR_ROOT", os.path.join(WORKSPACE_DIR, "..", "yuyin"))
+QWEN_ASR_PYTHON = _asr_path("QWEN_ASR_PYTHON", os.path.join(QWEN_ASR_ROOT, ".venv-qwen", "bin", "python"))
+QWEN_ASR_MODEL = _asr_path("QWEN_ASR_MODEL", os.path.join(QWEN_ASR_ROOT, "Qwen3-ASR-0.6B"))
+QWEN_ASR_DEVICE = os.environ.get("QWEN_ASR_DEVICE", "auto").strip() or "auto"
+QWEN_ASR_LANGUAGE = os.environ.get("QWEN_ASR_LANGUAGE", "Chinese").strip() or "Chinese"
+
+# GO2_ASR_BACKEND=whisper 可使用原来的 faster-whisper 独立子进程。
 # 模型路径允许相对项目目录配置，部署后不依赖启动命令的当前工作目录。
 _bundled_whisper_model = os.path.join(
     PROJECT_DIR, "voice", "models", "faster-whisper-small"

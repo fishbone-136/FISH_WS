@@ -75,6 +75,7 @@ class EnvironmentMapper(Node):
             return self.declare_parameter(name, value).value
         self.frame = param('map_frame', 'map')
         self.odom_frame = param('odom_frame', 'odom_lio')
+        self.sensor_frame = param('sensor_frame', 'livox_frame')
         self.resolution = float(param('resolution', 0.15))
         self.leaf = float(param('keyframe_voxel_size', 0.10))
         self.max_range = float(param('mapping_range', 8.0))
@@ -286,7 +287,7 @@ class EnvironmentMapper(Node):
                     preview = xyz_from_cloud(self.preview)
                     # Bound preview radius around the sensor, not map origin.
                     sensor = self.tf.lookup_transform(
-                        self.odom_frame, 'livox_frame', rclpy.time.Time())
+                        self.odom_frame, self.sensor_frame, rclpy.time.Time())
                     p = sensor.transform.translation
                     delta = preview - np.array([p.x, p.y, p.z])
                     preview = preview[(np.linalg.norm(delta, axis=1) < self.max_range) &

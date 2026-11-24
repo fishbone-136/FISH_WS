@@ -717,6 +717,7 @@ class MainControlPanel(QWidget):
         self.gesture_btn: ModeButton = None
         self.eye_btn: ModeButton = None
         self.vlm_btn: ModeButton = None
+        self.follow_btn: ModeButton = None
         self.mode_label: QLabel = None
         self.video_widget: VideoWidget = None
         self.log_top: QTextEdit = None
@@ -734,6 +735,11 @@ class MainControlPanel(QWidget):
         self.gesture_hint: QLabel = None
         self._mode_manager = ExclusiveActivityManager()
         self._starting_mode = None
+        self._follow_session = None
+        self._follow_controls = None
+        self._pending_follow_mode = None
+        self._follow_transition_epoch = 0
+        self._shutting_down = False
         self._visual_busy = False
         self._visual_motion_active = False
         self._text_motion = None
@@ -761,7 +767,7 @@ class MainControlPanel(QWidget):
         self._sig_text_motion_update.connect(self._on_text_motion_update)
 
         self._build()
-        for mode_name in ("语音交互", "手势控制", "眼动控制", "视觉感知"):
+        for mode_name in ("语音交互", "手势控制", "眼动控制", "视觉感知", "人体跟随"):
             self._mode_manager.register(
                 mode_name,
                 lambda name=mode_name: self._activate_mode(name),
@@ -807,8 +813,9 @@ class MainControlPanel(QWidget):
         self.eye_btn.setStyleSheet(self.eye_btn.styleSheet() +
                                   'QFrame#ModeButton:disabled { background: #101824; border-color: #263448; }')
         self.vlm_btn = ModeButton(os.path.join(_ICON_DIR, "vlm.svg"), "视觉感知")
+        self.follow_btn = ModeButton(os.path.join(_ICON_DIR,"renw.svg"),"人体跟随")
 
-        for btn in (self.voice_btn, self.gesture_btn, self.eye_btn, self.vlm_btn):
+        for btn in (self.voice_btn, self.gesture_btn, self.eye_btn, self.vlm_btn, self.follow_btn):
             btn.clicked.connect(self._on_mode_btn_clicked)
             self.top_left.layout.addWidget(btn)
 
@@ -906,8 +913,7 @@ class MainControlPanel(QWidget):
         self.color_info.setFixedHeight(40)
         self.color_info.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
         self.color_info.setStyleSheet("color: #B7D3E5; font-size: 13px; background: transparent; border: none;")
-        self.video_widget.frame_size_changed.connect(
-            lambda w, h: self.color_info.setText(f"彩色画面 · {w}×{h}"))
+        self.video_widget.frame_size_changed.connect(self._on_video_size_changed)
         self.top_right.layout.addWidget(self.color_info)
 
         layout.addWidget(self.top_left, 1)
@@ -1090,7 +1096,15 @@ class MainControlPanel(QWidget):
 
     def enter_safe_idle(self):
         """Stop interactive motion before handing control to autonomous Nav2."""
-        self._mode_manager.deactivate()
+        self._pending_follow_mode = None
+        self._follow_transition_epoch += 1
+        if self._mode_manager.deactivate() is False:
+            self._sync_mode_buttons()
+            return False
+        if self._follow_session is not None and self._follow_session.active:
+            self._follow_session.close(restore_camera=not self._shutting_down)
+            self._sync_mode_buttons()
+            return False
         self._close_text_motion()
         self._sync_mode_buttons()
         self.mode_label.setText("待机")
@@ -1118,9 +1132,23 @@ class MainControlPanel(QWidget):
                 robot.shutdown()
             except Exception:
                 pass
+        return True
+
+    def prepare_close(self):
+        self._shutting_down = True
+        self._pending_follow_mode = None
+        self._follow_transition_epoch += 1
+        if self._follow_session is not None and self._follow_session.active:
+            self._follow_session.close(restore_camera=False)
+            self._mode_manager.deactivate()
+            self._sync_mode_buttons()
+            return False
+        return True
 
     def shutdown(self):
-        self.enter_safe_idle()
+        self._shutting_down = True
+        if self.enter_safe_idle() is False:
+            return False
         self._stop_speech()
         if self.video_widget is not None:
             self.video_widget.shutdown()
@@ -1218,10 +1246,22 @@ class MainControlPanel(QWidget):
         if not btn:
             return
         text = btn.text().split(" ", 1)[-1]
+        self._select_mode(text)
+
+    def _select_mode(self,text):
+        if self._shutting_down:
+            return
+        self._follow_transition_epoch += 1
+        if self._follow_session is not None and self._follow_session.closing:
+            self._pending_follow_mode = text
+            self._sync_mode_buttons()
+            return
 
         self._starting_mode = text
         try:
-            self._mode_manager.activate(text)
+            started = self._mode_manager.activate(text)
+            if not started and self._follow_session is not None and self._follow_session.closing:
+                self._pending_follow_mode = text
         except Exception as exc:
             self.log_top.append(f"功能启动失败：{exc}")
         finally:
@@ -1229,16 +1269,21 @@ class MainControlPanel(QWidget):
             self._sync_mode_buttons()
 
     def stop_current_mode(self):
+        self._pending_follow_mode = None
+        self._follow_transition_epoch += 1
         self._mode_manager.deactivate()
         self._sync_mode_buttons()
 
     def _sync_mode_buttons(self):
         active = self._mode_manager.active
+        closing = self._follow_session is not None and self._follow_session.closing
         self.send_btn.setEnabled(active == "视觉感知" and not self._visual_busy)
-        self.stop_btn.setEnabled(active is not None)
-        for btn in (self.voice_btn, self.gesture_btn, self.eye_btn, self.vlm_btn):
+        self.stop_btn.setEnabled(active is not None or closing)
+        for btn in (self.voice_btn, self.gesture_btn, self.eye_btn, self.vlm_btn, self.follow_btn):
             btn.set_active(btn.text() == active)
-        if active is None:
+        if closing:
+            self.mode_label.setText('正在停止跟随…')
+        elif active is None:
             self.mode_label.setText("待机")
         else:
             self.mode_label.setText(active)
@@ -1277,6 +1322,8 @@ class MainControlPanel(QWidget):
             if self.voice_wave is not None:
                 self.voice_wave.set_state("off")
             return self._vlm_analyze_scene()
+        elif text == '人体跟随':
+            return self._start_person_follow()
         elif text == "眼动控制":
             self.mode_label.setText("眼动控制（未接入眼动仪）")
             ts = QDateTime.currentDateTime().toString("hh:mm:ss")
@@ -1310,9 +1357,93 @@ class MainControlPanel(QWidget):
             self._release_robot(self.gesture_controller, send_stop=False)
         elif text == "视觉感知":
             self._stop_vlm()
+        elif text == '人体跟随':
+            if self._follow_session is not None:
+                return self._follow_session.close(restore_camera=not self._shutting_down)
         else:
             if self.voice_wave is not None:
                 self.voice_wave.set_state("off")
+
+    def _start_person_follow(self):
+        if self.right_panel is None:
+            self.log_top.append('深度相机界面未就绪，无法打开人体跟随。')
+            return False
+        from go2_ui.person_follow import PersonFollowSession,FollowControls
+        if self._follow_controls is None:
+            self._follow_controls = FollowControls(self.right_panel.analysis_frame)
+            self.right_panel.analysis_frame.layout.addWidget(self._follow_controls)
+            self._follow_controls.start_requested.connect(self._begin_person_follow)
+            self._follow_controls.stop_requested.connect(self._pause_person_follow)
+        self._follow_controls.status.setPlainText('正在准备广角画面…')
+        self._follow_controls.metrics.setText('预览中 · 尚未启动跟随')
+        self._follow_controls.set_state(False,False,False)
+        self._follow_original_title = self.top_right.title_label.text()
+        self.top_right.title_label.setText('人体跟随 · 广角画面')
+        self.color_info.setText('广角红外画面 · 中心线辅助对准')
+        self.right_panel.analysis_frame.title_label.setText('人体跟随控制')
+        self.right_panel.analysis_widget.hide()
+        self.right_panel.refresh_btn.hide()
+        self._follow_controls.show()
+        session = PersonFollowSession(self.right_panel.depth_widget,self)
+        self._follow_session = session
+        session.status_changed.connect(self._on_follow_status)
+        session.state_changed.connect(self._follow_controls.set_state)
+        session.metrics_changed.connect(self._follow_controls.metrics.setText)
+        session.closed.connect(self._on_follow_closed)
+        self.video_widget.set_hand_detection(False)
+        self.video_widget.set_external_color_source(session.frame)
+        self.video_widget._timer.start(33)
+        return session.open()
+
+    def _begin_person_follow(self,speed,distance):
+        session = self._follow_session
+        if self._mode_manager.active != '人体跟随' or session is None or session.closing:
+            return
+        if not _DEPLOY_MODE:
+            self._on_follow_status('当前为离线界面，仅预览；请使用部署版启动跟随运动。')
+            return
+        allowed = getattr(self,'motion_start_allowed',None)
+        if callable(allowed) and not allowed():
+            self._on_follow_status('其他运动任务尚未停止，请先停止后再开始跟随。')
+            return
+        session.start_motion(speed,distance)
+
+    def _pause_person_follow(self):
+        if self._follow_session is not None:
+            self._follow_session.stop_motion()
+
+    def _on_follow_status(self,message):
+        if self._follow_controls is not None:
+            self._follow_controls.status.setPlainText(message)
+        self.log_top.append('人体跟随：'+message)
+
+    def _on_follow_closed(self):
+        session = self.sender()
+        if session is not self._follow_session:
+            return
+        if self._mode_manager.active == '人体跟随':
+            self._mode_manager.deactivate()
+        self._follow_session = None
+        self._follow_controls.hide()
+        self.right_panel.analysis_widget.show()
+        self.right_panel.refresh_btn.show()
+        self.right_panel.analysis_frame.title_label.setText('画面识别与对话')
+        self.top_right.title_label.setText(self._follow_original_title)
+        self.color_info.setText('实时彩色画面')
+        self.video_widget.set_external_color_source(self.right_panel.depth_widget.get_latest_color_sample)
+        self._sync_mode_buttons()
+        session.deleteLater()
+        pending,self._pending_follow_mode = self._pending_follow_mode,None
+        if self._shutting_down:
+            QTimer.singleShot(0,self.window().close)
+        elif pending is not None:
+            epoch = self._follow_transition_epoch
+            QTimer.singleShot(0,lambda:self._select_mode(pending)
+                              if epoch == self._follow_transition_epoch else None)
+
+    def _on_video_size_changed(self,w,h):
+        follow = self._mode_manager.active == '人体跟随' or self._starting_mode == '人体跟随'
+        self.color_info.setText(f'{"广角红外画面" if follow else "彩色画面"} · {w}×{h}')
 
     def _start_speech(self):
         if self.speech_ctrl is None:

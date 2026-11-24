@@ -16,13 +16,13 @@ traversability_mapper:
     use_pose_graph_cloud: false
     # Match the global navigation field at 125 ms. The
     # 15 Hz local scan layer continues handling immediate collision safety.
-    update_rate: 8.0
+    update_rate: 10.0
     # A short rolling window limits gait/LIO smear. Up to three recent frames
     # are sufficient because /scan independently handles immediate obstacles.
     history_seconds: 0.35
     max_history_clouds: 3
-    # Exact alignment with 4 cm local / 8 cm global safety overlays avoids
-    # extra edge expansion from overlapping, non-integral source cells.
+    # Both 4 cm LIO safety overlays refine an 8 cm terrain cell exactly, while
+    # measured obstacle endpoints retain their finer navigation positions.
     resolution: 0.08
     local_length_x: 10.0
     local_length_y: 10.0

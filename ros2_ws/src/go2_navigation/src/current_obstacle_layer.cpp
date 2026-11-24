@@ -6,8 +6,8 @@
 namespace go2_navigation
 {
 // Independent obstacle_memory owns persistent occupied geometry in LIO mode.
-// This layer contributes only the latest scan. Otherwise ObstacleLayer keeps
-// its own second history, even after the upstream memory proved a volume free.
+// This layer rebuilds from the short-lived scan buffer each cycle. Otherwise
+// ObstacleLayer keeps marks after the upstream memory proves a volume free.
 class CurrentObstacleLayer : public nav2_costmap_2d::ObstacleLayer
 {
 public:

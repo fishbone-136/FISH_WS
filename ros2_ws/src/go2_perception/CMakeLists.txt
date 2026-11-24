@@ -97,6 +97,7 @@ install(
 
 # 安装Python模块
 ament_python_install_package(${PROJECT_NAME})
+install(PROGRAMS scripts/unitree_navigation_source.py DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)

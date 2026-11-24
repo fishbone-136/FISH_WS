@@ -20,6 +20,13 @@ struct GroundPlane
   double height(const Eigen::Vector3d & point) const {return normal.dot(point) + offset;}
 };
 
+inline bool is_body_ground(const GroundPlane & plane)
+{
+  if (!plane.valid || !plane.normal.allFinite() || plane.normal.z() < .9063) {return false;}
+  const double height = -plane.offset / plane.normal.z();
+  return height >= -1.4 && height <= -.12;
+}
+
 // Bounded near-field RANSAC: only downward, approximately horizontal planes
 // with 2-D spatial support can be ground. Never classify a vertical wall as floor.
 inline GroundPlane estimate_ground(const std::vector<Eigen::Vector3d> & input)
@@ -50,10 +57,8 @@ inline GroundPlane estimate_ground(const std::vector<Eigen::Vector3d> & input)
     if (normal.norm() < 1.e-5) {continue;}
     normal.normalize();
     if (normal.z() < 0) {normal = -normal;}
-    if (normal.z() < 0.9063) {continue;}  // at most 25 degrees of tilt
     const double offset = -normal.dot(a);
-    const double z_at_base = -offset / normal.z();
-    if (z_at_base > -0.12 || z_at_base < -1.4) {continue;}
+    if (!is_body_ground({normal, offset, true})) {continue;}
     std::size_t count = 0;
     std::size_t below=0;
     for (const auto & p : points) {const double h=normal.dot(p)+offset;count+=std::abs(h)<.025;below+=h<-.06;}
@@ -83,12 +88,9 @@ inline GroundPlane estimate_ground(const std::vector<Eigen::Vector3d> & input)
   }
   Eigen::Vector3d normal = solver.eigenvectors().col(0);
   if (normal.z() < 0) {normal = -normal;}
-  if (normal.z() < 0.9063) {return GroundPlane{};}
   best.normal = normal;
   best.offset = -normal.dot(mean);
-  const double height=-best.offset/best.normal.z();
-  if(height>-.12 || height< -1.4) {return GroundPlane{};}
-  return best;
+  return is_body_ground(best) ? best : GroundPlane{};
 }
 // A single wrong floor plane must never become persistent obstacle evidence.
 // Bootstrap from repeated compatible fits; retain a recent good fit through a
@@ -165,7 +167,8 @@ inline GroundPlane refine_supported_ground(const std::vector<Eigen::Vector3d> & 
   Eigen::Vector3d normal=solve.eigenvectors().col(0);
   if(normal.dot(plane.normal)<0.)normal=-normal;
   if(normal.dot(plane.normal)<std::cos(8.*3.14159265358979323846/180.))return GroundPlane{};
-  return {normal,-normal.dot(mean),true};
+  const GroundPlane measured{normal,-normal.dot(mean),true};
+  return is_body_ground(measured) ? measured : GroundPlane{};
 }
 
 // Track floor geometry in continuous odometry, so a body pitch/height change
@@ -191,11 +194,14 @@ public:
         measured=refine_supported_ground(points,body_candidate);
     }
     supported_=measured.valid;
-    if(supported_)tracker_.confirm(stamp);
     // Use current measured geometry for filtering. Smoothing the body plane
     // itself would lag a fast pitch change and could turn flat floor into
     // apparent obstacles even though the world-floor reference was stable.
-    return supported_ ? measured : body;
+    if (supported_) {
+      tracker_.confirm(stamp);
+      return measured;
+    }
+    return is_body_ground(body) ? body : GroundPlane{};
   }
   bool supported() const {return supported_;}
 private:

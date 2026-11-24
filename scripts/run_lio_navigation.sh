@@ -12,7 +12,7 @@ if error:
     raise SystemExit(2)
 PY
 
-# A low-mounted HAP can lose most useful geometry when Go2 lies down.
+# A low stance obscures useful floor and obstacle observations.
 # Check actual feedback before starting any navigation/base nodes. Explicit
 # sensor-only runs do not require the standing navigation precondition.
 check_stance=true

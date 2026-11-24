@@ -112,6 +112,32 @@ inline double corridor_heading_tolerance(
   return low;
 }
 
+// The sampled global path is quantized. Use its tangent as the reference and
+// look for longer, more parallel wall support within a small heading range.
+inline Corridor detect_path_corridor(
+  const std::vector<ObstaclePoint> & points, double heading, double maximum_width)
+{
+  auto best = detect_corridor(points, heading, maximum_width);
+  for (const double offset : {-0.10, 0.10, -0.20, 0.20}) {
+    const auto candidate = detect_corridor(points, heading + offset, maximum_width);
+    if (!candidate.detected) {continue;}
+    if (!best.detected || candidate.end - candidate.start > best.end - best.start + 0.05 ||
+      (std::abs((candidate.end - candidate.start) - (best.end - best.start)) < 0.05 &&
+      candidate.width() > best.width() + 0.01))
+    {
+      best = candidate;
+    }
+  }
+  return best;
+}
+
+inline double corridor_center_yaw(const Corridor & corridor, double speed, double lookahead)
+{
+  const double center = corridor.center();
+  const double y = std::sin(corridor.heading) * lookahead + std::cos(corridor.heading) * center;
+  return std::clamp(2.0 * speed * y / (lookahead * lookahead + center * center), -0.30, 0.30);
+}
+
 inline bool path_enters_corridor(
   const Corridor & corridor, const std::vector<ObstaclePoint> & path)
 {
@@ -136,6 +162,34 @@ inline double continuity_cost(
     std::min(std::abs(wz), std::abs(previous_wz)) > 0.15 ? 1.0 : 0.0;
   return translation + yaw + reversal;
 }
+
+// A quadruped needs time to establish yaw motion. Do not alternate the only
+// two remaining pure-turn candidates every few controller cycles. This is a
+// bounded preference: a blocked committed turn releases immediately, and
+// translation/new goals are never constrained by it.
+class PureTurnCommitment
+{
+public:
+  void reset() {direction_ = 0.; until_ = 0.;}
+  double direction() const {return direction_;}
+  bool permits(double vx, double vy, double wz, double now, bool can_continue) const
+  {
+    return std::hypot(vx, vy) > 1.e-5 || std::abs(wz) < 1.e-5 ||
+           direction_ == 0. || wz * direction_ >= 0. || !can_continue || now >= until_;
+  }
+  void record(double vx, double vy, double wz, double now, double seconds)
+  {
+    if (std::hypot(vx, vy) > 1.e-5 || std::abs(wz) < 1.e-5 || seconds <= 0.) {
+      reset(); return;
+    }
+    if (direction_ == 0. || wz * direction_ < 0.) {
+      direction_ = std::copysign(1., wz); until_ = now + seconds;
+    }
+  }
+
+private:
+  double direction_{0.}, until_{0.};
+};
 
 class AlignmentHandoff
 {

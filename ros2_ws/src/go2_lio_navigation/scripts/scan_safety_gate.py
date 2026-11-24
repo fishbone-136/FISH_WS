@@ -6,7 +6,8 @@ import time
 import json
 import numpy as np
 
-from geometry_msgs.msg import Point32, PolygonStamped, Twist
+from geometry_msgs.msg import Point, Point32, PolygonStamped, Twist
+from visualization_msgs.msg import Marker
 import rclpy
 from rclpy.node import Node
 from rclpy.executors import ExternalShutdownException
@@ -18,15 +19,17 @@ from std_msgs.msg import Bool, String
 from go2_navigation.runtime_guard import acquire_process_lock
 
 from turn_clearance import braking_speed_scale, arc_collision_time
-from observation_window import ForwardObservationWindow, bound_sparse_command
-from reactive_safety import (ClosingApproach, SafetyRecoveryRamp, stop_zone_clear,
+from observation_window import ForwardObservationWindow, bound_sparse_command, lidar_blind_outline
+from raw_lidar_guard import RawLidarGuard
+from unitree_near_guard import UnitreeNearGuard, decode_cloud
+from reactive_safety import (ClosingApproach, SafetyRecoveryRamp, TurnRecoveryHold, stop_zone_clear,
                              close_clearance_scale, ObstacleGeometryCache, motion_stop_reason)
 
 
 class ScanSafetyGate(Node):
     def __init__(self):
         super().__init__('scan_safety_gate')
-        self.max_age = self.declare_parameter('max_scan_age', 0.35).value
+        self.max_age = self.declare_parameter('max_scan_age', 0.25).value
         self.command_timeout = self.declare_parameter('command_timeout', 0.2).value
         self.minimum_translation = float(self.declare_parameter('minimum_translation', .22).value)
         if not math.isfinite(self.minimum_translation) or self.minimum_translation <= 0.:
@@ -35,8 +38,19 @@ class ScanSafetyGate(Node):
         rate = self.declare_parameter('publish_rate', 50.0).value
         scan_topic = self.declare_parameter('scan_topic', '/scan_safety').value
         from go2_navigation.safety_geometry import configured_protection
-        front, rear, half_width = configured_protection()
+        nav_params = self.declare_parameter('nav_params', '').value
+        front, rear, half_width = configured_protection(nav_params or None)
         self.point_model = (front, rear, half_width) == (0., 0., 0.)
+        self.lidar_source = self.declare_parameter('lidar_source', 'hap').value
+        self.motion_enabled = self.declare_parameter('motion_enabled', True).value
+        if self.lidar_source not in ('hap', 'unitree'):
+            raise ValueError('Unsupported lidar_source')
+        self.raw_guard = RawLidarGuard(
+            sensor_x=float(self.declare_parameter('raw_sensor_x', .14).value),
+            front=max(front, .38), half_width=max(half_width, .15))
+        unitree_near = self.declare_parameter('unitree_near_required', False).value
+        self.unitree_required = bool(unitree_near) or self.lidar_source == 'unitree'
+        self.unitree_guard = UnitreeNearGuard(front=max(front, .38), half_width=max(half_width, .15))
         self.stop_front = float(self.declare_parameter('stop_front', front).value)
         self.stop_rear = float(self.declare_parameter('stop_rear', rear).value)
         self.stop_width = float(self.declare_parameter('stop_half_width', half_width).value)
@@ -55,6 +69,7 @@ class ScanSafetyGate(Node):
         self.recovery = SafetyRecoveryRamp(
             self.declare_parameter('recovery_linear_accel',.85).value,
             self.declare_parameter('recovery_angular_accel',1.80).value)
+        self.turn_recovery = TurnRecoveryHold()
         stop_geometry = (self.stop_front, self.stop_rear, self.stop_width,
                          self.approach.stop_front)
         if (not all(math.isfinite(x) for x in stop_geometry) or
@@ -98,9 +113,18 @@ class ScanSafetyGate(Node):
         self.ego_received = self.ego_stamp = -1.e30
         self.diagnostics = self.create_publisher(String, '/safety/motion_diagnostics', 1)
         # Publish the same configured execution geometry used by the controller.
+        # The existing RViz safety-marker display receives this diagnostic
+        # sector. It never changes costmap occupancy or fabricates an object.
+        self.visibility_markers = self.create_publisher(Marker, '/safety/navigation_fault_marker',
+            QoSProfile(depth=3, durability=DurabilityPolicy.TRANSIENT_LOCAL))
+        self.last_visibility_marker=-math.inf
         self.body_footprint = self.create_publisher(
             PolygonStamped, '/safety/body_footprint', 1)
         self.output = self.create_publisher(Twist, '/cmd_vel_guarded', 1)
+        self.motion_mode = self.create_publisher(
+            Bool, '/go2/navigation_motion_enabled',
+            QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL))
+        self.motion_mode.publish(Bool(data=self.motion_enabled))
         self.status = self.create_publisher(
             Bool, '/safety/scan_valid',
             QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL))
@@ -116,6 +140,11 @@ class ScanSafetyGate(Node):
         self.create_subscription(PointCloud2, '/safety/remembered_obstacles', self.on_memory,
                                  latest_sensor)
         self.create_subscription(LaserScan, scan_topic, self.on_scan, latest_sensor)
+        if self.lidar_source == 'hap':
+            self.create_subscription(PointCloud2, '/livox/lidar', self.on_raw_cloud, latest_sensor)
+        if self.unitree_required:
+            self.create_subscription(PointCloud2, '/utlidar/cloud', self.on_unitree_raw, latest_sensor)
+            self.create_subscription(PointCloud2, '/utlidar/cloud_base', self.on_unitree_body, latest_sensor)
         self.create_subscription(
             PolygonStamped, '/local_costmap/published_footprint', self.on_footprint,
             qos_profile_sensor_data)
@@ -130,6 +159,40 @@ class ScanSafetyGate(Node):
             (self.stop_front, self.stop_width), (self.stop_front, -self.stop_width),
             (-self.stop_rear, -self.stop_width), (-self.stop_rear, self.stop_width))]
         self.body_footprint.publish(message)
+        if time.monotonic()-self.last_visibility_marker>=.5:
+            self.last_visibility_marker=time.monotonic()
+            if self.lidar_source == 'hap':
+                self.publish_hap_blind_zone()
+            if self.unitree_required:
+                contact = Marker()
+                contact.header.frame_id = 'base_link'
+                contact.ns = 'unitree_near_contact'; contact.id = 0
+                contact.type = Marker.SPHERE_LIST; contact.action = Marker.ADD
+                contact.pose.orientation.w = 1.; contact.frame_locked = True
+                contact.scale.x = contact.scale.y = contact.scale.z = .035
+                contact.color.r = 1.; contact.color.a = .9
+                # A replaced snapshot, never a growing trail or clearing ray.
+                points = self.unitree_guard.near_points if time.monotonic()-self.unitree_guard.received <= .2 else []
+                contact.points = [Point(x=float(p[0]), y=float(p[1]), z=float(p[2])) for p in points[::max(1, len(points)//256)]]
+                self.visibility_markers.publish(contact)
+
+    def publish_hap_blind_zone(self):
+        outline=Marker()
+        outline.header.frame_id='livox_frame'
+        outline.ns='hap_blind_zone';outline.id=0
+        outline.type=Marker.LINE_STRIP;outline.action=Marker.ADD
+        outline.pose.orientation.w=1.;outline.frame_locked=True
+        outline.scale.x=.012
+        outline.color.r=1.;outline.color.g=.65;outline.color.b=.05;outline.color.a=.8
+        outline.points=[Point(x=float(x),y=float(y),z=-.10) for x,y in lidar_blind_outline()]
+        self.visibility_markers.publish(outline)
+        label=Marker()
+        label.header.frame_id='livox_frame';label.ns='hap_blind_zone';label.id=1
+        label.type=Marker.TEXT_VIEW_FACING;label.action=Marker.ADD
+        label.pose.orientation.w=1.;label.pose.position.x=.35;label.pose.position.z=.08
+        label.frame_locked=True;label.scale.z=.06;label.color=outline.color
+        label.text='HAP <0.5m: NOT RELIABLE'
+        self.visibility_markers.publish(label)
 
     def on_command(self, command):
         self.command, self.command_received = command, time.monotonic()
@@ -168,6 +231,30 @@ class ScanSafetyGate(Node):
         # Do not wait for the next velocity packet/timer to stop a new hazard.
         self.step(event_driven=True)
 
+    def on_raw_cloud(self, message):
+        stamp = message.header.stamp.sec + message.header.stamp.nanosec / 1.e9
+        points = np.empty((0, 3))
+        supported = message.header.frame_id == 'livox_frame' and message.height == 1
+        try:
+            fields = {f.name: f for f in message.fields}
+            supported = supported and all(
+                k in fields and fields[k].datatype == 7 and fields[k].count == 1 and
+                fields[k].offset + 4 <= message.point_step for k in ('x', 'y', 'z'))
+            if supported:
+                dtype = np.dtype({'names': ['x', 'y', 'z'],
+                    'formats': [('>f4' if message.is_bigendian else '<f4')] * 3,
+                    'offsets': [fields[k].offset for k in ('x', 'y', 'z')],
+                    'itemsize': message.point_step})
+                data = np.frombuffer(message.data, dtype=dtype, count=message.width)
+                points = np.column_stack([data[k] for k in ('x', 'y', 'z')])
+        except (ValueError, TypeError):
+            supported = False
+        self.raw_guard.observe(points, stamp, time.monotonic(), supported)
+        # Hazard reductions are immediate. Healthy raw packets need no second
+        # full arc evaluation alongside the 50 Hz timer and scan callback.
+        if self.raw_guard.condition != 'none':
+            self.step(event_driven=True)
+
     def on_odom(self, message):
         velocity = message.twist.twist
         values = (velocity.linear.x, velocity.linear.y, velocity.angular.z)
@@ -178,9 +265,40 @@ class ScanSafetyGate(Node):
             p,q = message.pose.pose.position,message.pose.pose.orientation
             if all(math.isfinite(v) for v in (p.x,p.y,q.x,q.y,q.z,q.w)) and (
                     q.x*q.x+q.y*q.y+q.z*q.z+q.w*q.w > .5):
+                if self.ego_frame is not None and self.ego_frame != message.header.frame_id:
+                    self.unitree_guard.invalidate()
                 self.ego_pose = (p.x,p.y,math.atan2(2*(q.w*q.z+q.x*q.y),
                                                   1-2*(q.y*q.y+q.z*q.z)))
                 self.ego_frame = message.header.frame_id
+
+    def on_unitree(self, message, kind):
+        guard = self.unitree_guard
+        try:
+            expected = 'utlidar_lidar' if kind == 'raw' else 'base_link'
+            if message.header.frame_id != expected:
+                raise ValueError('Unexpected Unitree cloud frame')
+            points, keys = decode_cloud(message)
+            stamp = message.header.stamp.sec + message.header.stamp.nanosec / 1.e9
+            received = time.monotonic()
+            if kind == 'raw':
+                guard.observe_raw(points, keys, stamp, received, self.unitree_pose(received))
+            else:
+                guard.observe_body(points, keys, stamp, received)
+        except (ValueError, TypeError, BufferError):
+            guard.invalidate()
+        if guard.reason(time.monotonic()) != 'none' or (kind == 'raw' and len(guard.near_points)):
+            self.step(event_driven=True)
+
+    def unitree_pose(self, steady):
+        now = self.get_clock().now().nanoseconds/1.e9
+        return self.ego_pose if (steady-self.ego_received <= .5 and
+                                -.05 <= now-self.ego_stamp <= .5) else None
+
+    def on_unitree_raw(self, message):
+        self.on_unitree(message, 'raw')
+
+    def on_unitree_body(self, message):
+        self.on_unitree(message, 'body')
 
     def on_memory(self,message):
         self.memory_received = time.monotonic()
@@ -253,7 +371,12 @@ class ScanSafetyGate(Node):
             self.memory_supported and self.ego_pose is not None and self.memory_frame==self.ego_frame and
             steady-self.memory_received<=.75 and -.05<=current-self.memory_stamp<=.75 and
             steady-self.ego_received<=.5 and -.05<=current-self.ego_stamp<=.5))
-        ready = valid and footprint_valid and memory_valid
+        unitree_reason = self.unitree_guard.reason(steady) if self.unitree_required else 'disabled'
+        raw_reason = (unitree_reason if self.lidar_source == 'unitree' else
+                      self.raw_guard.reason(current, steady))
+        raw_valid = raw_reason == 'none'
+        unitree_valid = not self.unitree_required or unitree_reason == 'none'
+        ready = valid and footprint_valid and memory_valid and raw_valid and unitree_valid
         if ready != self.last_ready:
             self.get_logger().info('Motion gate %s (scan=%s, footprint=%s, memory=%s)' % (
                 'ready' if ready else 'closed', bool(valid), bool(footprint_valid), bool(memory_valid)))
@@ -264,7 +387,7 @@ class ScanSafetyGate(Node):
         fresh_command = steady - self.command_received <= self.command_timeout
         finite_command = all(math.isfinite(x) for x in (
             self.command.linear.x, self.command.linear.y, self.command.angular.z))
-        candidate = self.command if ready and fresh_command and finite_command else Twist()
+        candidate = self.command if self.motion_enabled and ready and fresh_command and finite_command else Twist()
         sparse_bounded = False
         if not self.front_observed:
             bounded = bound_sparse_command(
@@ -289,16 +412,34 @@ class ScanSafetyGate(Node):
         requested = tuple(caution*x for x in requested)
         braking = braking_speed_scale(
             obstacles, *requested, half_length, half_width, max(0., age)) if moving else 1.
-        turn_clear = braking > 0.
+        unitree_scale, unitree_motion_reason = (self.unitree_guard.motion_scale(
+            *requested, steady, self.unitree_pose(steady),
+            max(half_length, self.unitree_guard.front),
+            max(half_width, self.unitree_guard.half_width))
+            if self.unitree_required else (1., 'disabled'))
+        turn_clear = braking > 0. and unitree_scale > 0.
         if turn_clear != self.last_turn_clear:
             self.turn_status.publish(Bool(data=turn_clear))
-            if not turn_clear:
-                self.get_logger().info('Turn blocked: observed obstacle in padded swept footprint')
+            if not turn_clear and moving:
+                blockers = []
+                if braking <= 0.:
+                    for label, points in (('safety scan', self.obstacle_points),
+                                          ('obstacle memory', remembered)):
+                        if braking_speed_scale(points, *requested, half_length, half_width,
+                                               max(0., age)) <= 0.:
+                            blockers.append(label)
+                    if not blockers:
+                        blockers.append('combined safety scan and obstacle memory')
+                if unitree_scale <= 0.:
+                    blockers.append(unitree_motion_reason)
+                self.get_logger().info(
+                    'Braking arc blocked for vx=%.3f m/s, vy=%.3f m/s, wz=%.3f rad/s (%s)' %
+                    (*requested, ', '.join(blockers)))
             self.last_turn_clear = turn_clear
         hard_clear = stop_zone_clear(
             obstacles, self.stop_front, self.stop_rear, self.stop_width)
-        permitted = ready and fresh_command and finite_command and turn_clear and hard_clear
-        ratio = min(braking, self.approach.scale(
+        permitted = self.motion_enabled and ready and fresh_command and finite_command and turn_clear and hard_clear
+        ratio = min(braking, unitree_scale, self.approach.scale(
             requested[0], current, requested[1], requested[2], half_width)) if permitted else 0.
         memory_scale = 1.
         if len(remembered) and math.hypot(requested[0],requested[1])>1.e-6:
@@ -308,8 +449,16 @@ class ScanSafetyGate(Node):
             if math.isfinite(contact):
                 memory_scale=max(0.,min(1.,(contact-memory_pose_age-.20)/self.approach.horizon))
             ratio=min(ratio,memory_scale)
-        limited = not permitted or ratio < 1. or caution < 1.
+        turning = (fresh_command and finite_command and
+                   math.hypot(self.command.linear.x, self.command.linear.y) <= 1.e-6 and
+                   abs(self.command.angular.z) > 1.e-6)
+        turn_can_move = permitted and ratio > 1.e-6 and abs(requested[2]) > 1.e-6
+        turn_released = self.turn_recovery.allows(turning, turn_can_move, steady)
+        turn_waiting = turning and turn_can_move and not turn_released
+        limited = not permitted or ratio < 1. or caution < 1. or not turn_released
         safe = tuple(ratio*x for x in requested)
+        if not turn_released:
+            safe = (0., 0., 0.)
         # A safety-limited trajectory below the usable walking speed is
         # infeasible, not a new steady walking command. Do not raise it to the
         # minimum: that would violate the contact prediction. Ordinary startup
@@ -324,11 +473,18 @@ class ScanSafetyGate(Node):
         # Axis-wise recovery changes curvature. Check that exact command, then
         # uniformly reduce the checked arc; never emit an unchecked transition.
         final_ratio = 1. if permitted else 0.
+        unitree_recovery_scale = 1.
         if recovered != safe and any(abs(x) > 1.e-6 for x in recovered) and permitted:
             final_ratio = self.approach.braking_scale(
                 *recovered,current,half_length,half_width)
             final_ratio = min(final_ratio,braking_speed_scale(
                 obstacles,*recovered,half_length,half_width,max(0.,age)))
+            if self.unitree_required:
+                unitree_recovery_scale, _ = self.unitree_guard.motion_scale(
+                    *recovered, steady, self.unitree_pose(steady),
+                    max(half_length, self.unitree_guard.front),
+                    max(half_width, self.unitree_guard.half_width))
+                final_ratio = min(final_ratio, unitree_recovery_scale)
         checked = tuple(final_ratio*x for x in recovered)
         checked_speed = math.hypot(checked[0], checked[1])
         if final_ratio < 1.-1.e-6 and 1.e-6 < checked_speed < self.minimum_translation-1.e-6:
@@ -343,8 +499,18 @@ class ScanSafetyGate(Node):
         command = (output.linear.x, output.linear.y, output.angular.z)
         reason = motion_stop_reason(valid, footprint_valid, memory_valid, fresh_command,
                                     finite_command, hard_clear, turn_clear)
+        if not raw_valid:
+            reason = raw_reason
+        if not unitree_valid:
+            reason = unitree_reason
+        elif unitree_scale <= 0.:
+            reason = unitree_motion_reason
+        if not self.motion_enabled:
+            reason = 'motion_disabled'
         if reason == 'none' and below_gait:
             reason = 'execution_below_gait'
+        if reason == 'none' and turn_waiting:
+            reason = 'turn_recovery_wait'
         input_moving = any(abs(x) > 1.e-6 for x in (
             self.command.linear.x, self.command.linear.y, self.command.angular.z))
         if reason == 'none' and input_moving and not any(abs(x) > 1.e-6 for x in command):
@@ -353,7 +519,8 @@ class ScanSafetyGate(Node):
             elif ratio <= 1.e-6:
                 reason = 'approach_contact'
             elif final_ratio <= 1.e-6:
-                reason = 'recovery_arc_blocked'
+                reason = ('unitree_recovery_arc_blocked' if unitree_recovery_scale <= 1.e-6
+                          else 'recovery_arc_blocked')
             elif sparse_bounded and not any(abs(x) > 1.e-6 for x in requested):
                 reason = 'forward_observation_pending'
             else:
@@ -369,6 +536,21 @@ class ScanSafetyGate(Node):
             self.last_diagnostic = steady
             self.diagnostics.publish(String(data=json.dumps({
                 'scan_valid': bool(valid), 'footprint_valid': bool(footprint_valid),
+                'raw_lidar_valid': raw_valid, 'raw_lidar_reason': raw_reason,
+                'unitree_required': self.unitree_required, 'unitree_reason': unitree_reason,
+                'unitree_policy': 'directional_braking_v2',
+                'unitree_braking_scale': round(unitree_scale, 3),
+                'unitree_motion_reason': unitree_motion_reason,
+                'unitree_recovery_scale': round(unitree_recovery_scale, 3),
+                'unitree_near_returns': len(self.unitree_guard.near_points),
+                'unitree_receive_age': round(steady-self.unitree_guard.received, 3) if self.unitree_required and math.isfinite(self.unitree_guard.received) else None,
+                'unitree_transform_error_m': self.unitree_guard.calibration_error if math.isfinite(self.unitree_guard.calibration_error) else None,
+                'raw_forward_returns': self.raw_guard.forward_returns,
+                'raw_near_returns': self.raw_guard.near_returns,
+                'raw_age': round(current-self.raw_guard.stamp, 3) if self.lidar_source == 'hap' else None,
+                'lidar_source': self.lidar_source,
+                'motion_enabled': self.motion_enabled,
+                'hardware_blind_range_m': .5 if self.lidar_source == 'hap' else None,
                 'front_observed': bool(self.front_observed), 'sparse_bounded': sparse_bounded,
                 'memory_valid': bool(memory_valid), 'remembered_points': len(remembered),
                 'memory_age': round(current-self.memory_stamp, 3),
@@ -381,6 +563,7 @@ class ScanSafetyGate(Node):
                 'memory_approach_scale': round(memory_scale,3),
                 'command_fresh': bool(fresh_command), 'hard_zone_clear': bool(hard_clear),
                 'turn_clear': bool(turn_clear), 'scan_age': round(age, 3),
+                'scan_memory_braking_scale': round(braking, 3),
                 'caution_scale': round(caution, 3), 'approach_braking_scale': round(ratio, 3),
                 'recovery_check_scale': round(final_ratio, 3),
                 'external_closing_speed': round(self.approach.closing, 3),

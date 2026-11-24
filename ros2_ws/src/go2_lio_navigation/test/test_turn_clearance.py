@@ -45,6 +45,14 @@ class TurnClearanceTests(unittest.TestCase):
         self.assertFalse(self.clear([(.49, .1)]))
         self.assertFalse(self.clear([], angular=float('nan')))
 
+    def test_braking_checks_exact_turn_floor_before_stopping(self):
+        for angular in (.55, .65, -.55, -.65):
+            with self.subTest(angular=angular):
+                scale = module.braking_speed_scale([(-.395, 0.)], 0., 0., angular, .38, .175, .10)
+                self.assertAlmostEqual(abs(angular) * scale, .50)
+                self.assertEqual(
+                    module.braking_speed_scale([(-.390, 0.)], 0., 0., angular, .38, .175, .10), 0.)
+
 
 if __name__ == '__main__':
     unittest.main()

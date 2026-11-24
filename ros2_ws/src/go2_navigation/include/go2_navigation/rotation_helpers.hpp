@@ -93,6 +93,79 @@ private:
   double direction_{0.0};
 };
 
+inline constexpr double full_turn = 2.0 * 3.14159265358979323846;
+
+inline double rotation_in_direction(double shortest_error, double direction)
+{
+  return shortest_error * direction < 0.0 ?
+         direction * (full_turn - std::abs(shortest_error)) : shortest_error;
+}
+
+// Retain a checked direction over small path updates and check progress using
+// observed yaw. A direction selected in software alone is not progress.
+class PathAlignmentTurn
+{
+public:
+  void reset() {direction_ = 0.0;}
+  bool active() const {return direction_ != 0.0;}
+  bool alternative() const {return active() && alternative_;}
+  bool escape() const {return alternative() && escape_;}
+  double direction() const {return direction_;}
+
+  void start(double heading, double yaw, double now, double error, bool alternate = false)
+  {
+    direction_ = std::copysign(1.0, error);
+    heading_ = heading;
+    progress_yaw_ = yaw;
+    progress_at_ = last_update_ = now;
+    alternative_ = alternate;
+    escape_ = alternate && std::abs(error) <= escape_angle;
+    escape_heading_ = yaw + error;
+  }
+
+  void update(double heading, double yaw, double now)
+  {
+    if (!active()) {return;}
+    if (now < last_update_ || now - last_update_ > 0.75 ||
+      std::abs(std::remainder(heading - heading_, full_turn)) > 0.50)
+    {
+      reset();
+      return;
+    }
+    last_update_ = now;
+    if (direction_ * std::remainder(yaw - progress_yaw_, full_turn) >= 0.08) {
+      progress_yaw_ = yaw;
+      progress_at_ = now;
+    }
+  }
+
+  bool stalled() const {return active() && last_update_ - progress_at_ >= 1.25;}
+
+  double remaining(double shortest_error, double yaw) const
+  {
+    if (escape()) {return std::remainder(escape_heading_ - yaw, full_turn);}
+    if (alternative() || (active() && std::abs(shortest_error) > 2.8)) {
+      return rotation_in_direction(shortest_error, direction_);
+    }
+    return shortest_error;
+  }
+
+  static double other_side(double shortest_error, double preferred_error)
+  {
+    const auto direction = -std::copysign(1., preferred_error);
+    const auto alternate = rotation_in_direction(shortest_error, direction);
+    // For a forward-side target, try a bounded turn away and then reconsider
+    // a translating arc. A nearly full revolution is a poor detour here.
+    return std::abs(alternate) > 0.75 * full_turn ? direction * escape_angle : alternate;
+  }
+
+private:
+  static constexpr double escape_angle = 0.60;
+  double direction_{0.0}, heading_{0.0}, progress_yaw_{0.0};
+  double progress_at_{0.0}, last_update_{0.0}, escape_heading_{0.0};
+  bool alternative_{false}, escape_{false};
+};
+
 inline double rotation_velocity(
   double error, double tolerance, double current,
   double maximum, double minimum, double gain, double acceleration, double dt)

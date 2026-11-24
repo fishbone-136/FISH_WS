@@ -22,7 +22,7 @@ def main():
     managed = ManagedChildren(parent)
     try:
         child = managed.start(['bash', str(root/'scripts/run_lio_navigation.sh'),
-                               'use_rviz:=false'], cwd=str(root))
+                               'lidar_source:=unitree', 'use_rviz:=false'], cwd=str(root))
         while not stopping and managed.owner_alive() and child.poll() is None:
             time.sleep(.1)
         return child.returncode if child.poll() is not None else 0

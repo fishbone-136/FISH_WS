@@ -872,6 +872,20 @@ private:
         }
       }
 
+      // A single StopMove edge can be lost or delayed behind transport work.
+      // Retry at 5 Hz only while fresh robot feedback still reports motion;
+      // stop retrying once stationary, and never override an interactive lease.
+      const auto stop_age_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count() - last_stop_request_ns_.load();
+      if (received_cmd_ && !command_active_ && !interactive_active_ && stop_sent_for_zero_ &&
+        last_motion_feedback_time_.nanoseconds() != 0 &&
+        (now() - last_motion_feedback_time_).seconds() <= motion_feedback_stale_timeout_ &&
+        (measured_sport_linear_speed_ >= motion_feedback_min_linear_ ||
+        measured_sport_angular_speed_ >= motion_feedback_min_angular_) && stop_age_ns >= 200000000)
+      {
+        should_stop = true;
+      }
+
       if (command_active_) {
         requested_linear = std::hypot(
           last_command_velocity_.linear.x, last_command_velocity_.linear.y);
@@ -942,7 +956,7 @@ private:
         sport_state_topic_.c_str());
     }
     if (should_stop) {
-      RCLCPP_WARN(get_logger(), "cmd_vel timed out; sending StopMove");
+      RCLCPP_WARN(get_logger(), "Command stop/watchdog: sending StopMove until stationary");
       stopRobot();
     } else if (republish_interactive) {
       publishMove(
@@ -956,6 +970,8 @@ private:
   // 停止机器人
   void stopRobot()
   {
+    last_stop_request_ns_.store(std::chrono::duration_cast<std::chrono::nanoseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count());
     unitree_api::msg::Request req;
     sport_client_->StopMove(req);
     prepareRequest(req, true);
@@ -1005,6 +1021,7 @@ private:
   std::atomic<std::int64_t> next_request_id_{
     std::chrono::duration_cast<std::chrono::nanoseconds>(
       std::chrono::steady_clock::now().time_since_epoch()).count()};
+  std::atomic<std::int64_t> last_stop_request_ns_{0};
   bool received_cmd_{false};
   bool watchdog_stopped_{false};
   bool command_active_{false};

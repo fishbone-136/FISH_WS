@@ -99,6 +99,10 @@ private:
   bool level_scan_;
   double tolerance_;
   bool ground_filter_enabled_;
+  bool require_ground_for_scan_;
+  rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr scan_mirror_;
+  rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr obstacle_mirror_;
+  rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr ground_mirror_;
   bool observed_free_space_only_;
   double ground_clearance_;
   double obstacle_height_;

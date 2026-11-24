@@ -24,7 +24,7 @@ def generate_launch_description():
                 "HAP_config.json",
             ]),
         ),
-        DeclareLaunchArgument("publish_freq", default_value="15.0"),
+        DeclareLaunchArgument("publish_freq", default_value="20.0"),
         DeclareLaunchArgument(
             "xfer_format",
             default_value="0",

@@ -105,8 +105,8 @@ bt_navigator:
 controller_server:
   ros__parameters:
     use_sim_time: false
-    # Follow the 15 Hz HAP safety lane with a new checked arc each cycle.
-    controller_frequency: 15.0
+    # Follow the 20 Hz HAP safety lane with a new checked arc each cycle.
+    controller_frequency: 20.0
     min_x_velocity_threshold: 0.001
     min_y_velocity_threshold: 0.001
     min_theta_velocity_threshold: 0.001
@@ -156,7 +156,7 @@ controller_server:
       # Far from alignment turn faster; slow down near handover. The shim
       # collision-checks this profile before the downstream smoother sees it.
       rotate_to_heading_angular_vel: 1.4
-      min_rotation_angular_vel: 0.55
+      min_rotation_angular_vel: 0.50
       final_rotation_angular_vel: 0.65
       final_min_rotation_angular_vel: 0.50
       goal_position_hysteresis: 0.0
@@ -185,18 +185,18 @@ controller_server:
       max_speed_xy: 0.65
       # Keep pure-turn samples in the usable gait range upstream, where the
       # trajectory collision checker can account for the actual command.
-      min_speed_theta: 0.55
+      min_speed_theta: 0.50
       acc_lim_x: 0.85
       acc_lim_y: 0.0
       acc_lim_theta: 2.00
       decel_lim_x: -1.10
       decel_lim_y: 0.0
       decel_lim_theta: -2.20
-      # 11 x 1 x 25 = 275 candidates (-27%); preserve fine yaw spacing and
-      # the full collision horizon at the sensor-matched 15 Hz control rate.
-      vx_samples: 11
+      # 9 x 1 x 21 = 189 candidates: 3780/s at 20 Hz, below the previous
+      # 4125/s at 15 Hz; retain the full 1.7 s collision horizon.
+      vx_samples: 9
       vy_samples: 1
-      vtheta_samples: 25
+      vtheta_samples: 21
       sim_time: 1.7
       linear_granularity: 0.05
       angular_granularity: 0.04
@@ -212,6 +212,9 @@ controller_server:
       GaitSafety.scale: 3.0
       GaitSafety.minimum_translation: 0.22
       GaitSafety.history_timeout: 0.5
+      # Let yaw gait establish before switching between two pure-turn samples.
+      # A blocked old direction, translation or a new goal releases this hold.
+      GaitSafety.turn_commitment_seconds: 2.0
       # Point collision and soft inflation are evaluated once by BaseObstacle.
       BaseObstacle.scale: 0.60
       # 靠近终点时优先缩短位置距离，而不是为贴合路径切线原地对齐。
@@ -228,7 +231,7 @@ controller_server:
       angular_disengage_threshold: 0.28
       forward_sampling_distance: 0.65
       rotate_to_heading_angular_vel: 1.4
-      min_rotation_angular_vel: 0.55
+      min_rotation_angular_vel: 0.50
       final_rotation_angular_vel: 0.65
       final_min_rotation_angular_vel: 0.50
       goal_position_hysteresis: 0.0
@@ -241,9 +244,9 @@ controller_server:
       simulate_ahead_time: 1.80
       closed_loop: false
       rotate_to_goal_heading: false
-      # Match the 15 Hz controller, retaining approximately 2.5 s lookahead.
-      time_steps: 38
-      model_dt: 0.0666666667
+      # Match the 20 Hz controller, retaining approximately 2.5 s lookahead.
+      time_steps: 50
+      model_dt: 0.05
       batch_size: 600
       vx_std: 0.20
       vy_std: 0.0
@@ -289,17 +292,16 @@ controller_server:
 local_costmap:
   local_costmap:
     ros__parameters:
-      update_frequency: 15.0
-      # A 10 Hz ceiling publishes about every second 15 Hz safety tick.
-      publish_frequency: 10.0
+      update_frequency: 20.0
+      # Publish each 20 Hz update; full maps are replaced by small deltas.
+      publish_frequency: 20.0
       global_frame: odom
       robot_base_frame: base_link
       use_sim_time: false
       rolling_window: true
-      # User-selected 4 m rolling window: 2 m from the robot centre on each
-      # side. Raw-scan safety checks retain their independent sensor range.
-      width: 4
-      height: 4
+      # 5 m rolling window: 2.5 m from the robot centre on each side.
+      width: 5
+      height: 5
       resolution: 0.04
       # Point planning: coincident origin vertices, no extra padding.
       # Real body protection is configured separately in physical_safety.
@@ -354,20 +356,20 @@ local_costmap:
         group_connectivity_type: 8
       inflation_layer:
         plugin: nav2_costmap_2d::InflationLayer
-        # Soft preference out to 30 cm, NOT a minimum-clearance constraint.
+        # Soft preference out to 18 cm; physical clearance is checked separately.
         cost_scaling_factor: 8.0
-        inflation_radius: 0.30
+        inflation_radius: 0.18
       always_send_full_costmap: false
 
 global_costmap:
   global_costmap:
     ros__parameters:
-      # 125 ms global terrain/costmap updates match the structural terrain.
-      # The local collision layer and controller run at 15 Hz.
-      update_frequency: 8.0
+      # 100 ms global terrain/costmap updates match the structural terrain.
+      # The local collision layer and controller run at 20 Hz.
+      update_frequency: 10.0
       # Slightly above the update rate so every update can publish, avoiding
       # half-rate output when two equal-period clocks fall on opposite sides.
-      publish_frequency: 10.0
+      publish_frequency: 20.0
       global_frame: map
       robot_base_frame: base_link
       use_sim_time: false
@@ -420,8 +422,8 @@ global_costmap:
       inflation_layer:
         plugin: nav2_costmap_2d::InflationLayer
         cost_scaling_factor: 8.0
-        # Soft preference out to 30 cm, NOT a minimum-clearance constraint.
-        inflation_radius: 0.30
+        # Soft preference out to 18 cm; physical clearance is checked separately.
+        inflation_radius: 0.18
       always_send_full_costmap: false
 
 map_server:
@@ -535,10 +537,10 @@ velocity_smoother:
     velocity_timeout: 0.5
 
 # Physical emergency envelope, independent of the point planning model.
-# Width measured by user: 30 cm. Length retains the configured 76 cm.
+# Protected width is 35 cm, with the existing 76 cm length.
 physical_safety:
   ros__parameters:
-    # Experimental point execution. Use rectangle to restore the body below.
-    collision_model: point
-    footprint: "[[0.38, 0.15], [0.38, -0.15], [-0.38, -0.15], [-0.38, 0.15]]"
+    # Use the real body envelope for execution, independently of point planning.
+    collision_model: rectangle
+    footprint: "[[0.38, 0.175], [0.38, -0.175], [-0.38, -0.175], [-0.38, 0.175]]"
     footprint_padding: 0.0

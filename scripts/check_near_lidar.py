@@ -40,11 +40,34 @@ def stamp_ns(message):
     return message.header.stamp.sec * 1000000000 + message.header.stamp.nanosec
 
 
+def clock_diagnostics(samples):
+    """Distinguish progressing device data from ROS-clock-compatible data.
+
+    A constant clock offset is reported, never silently fixed: receive time
+    alone cannot certify measurement time or calibration for motion control.
+    """
+    a=np.asarray(samples,dtype=float).reshape(-1,2)
+    if not len(a):return {'messages':0,'host_clock_compatible':False}
+    if not np.isfinite(a).all():raise ValueError('Non-finite clock sample')
+    offsets=a[:,1]-a[:,0]
+    delta=np.diff(a[:,0])
+    device_span=float(a[-1,0]-a[0,0]);host_span=float(a[-1,1]-a[0,1])
+    return {'messages':len(a),'device_span_seconds':device_span,
+            'host_span_seconds':host_span,'regressions':int((delta<0.).sum()),
+            'duplicate_stamps':int((delta==0.).sum()),
+            'offset_seconds_min_median_max':[float(np.min(offsets)),float(np.median(offsets)),float(np.max(offsets))],
+            'host_clock_compatible':bool(np.all((offsets>=-.05)&(offsets<=.5))),
+            'device_time_progressing':bool(len(a)>=3 and np.all(delta>0.) and host_span>.1
+                and abs(device_span-host_span)<=max(.1,.1*host_span))}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--seconds', type=float, default=10.)
     parser.add_argument('--label', default='uncontrolled scene')
+    parser.add_argument('--unitree-only', action='store_true',
+        help='Audit built-in lidar in its native frames; do not assume HAP TF or synchronized clocks')
     parser.add_argument('--half-width', type=float, default=.6)
     args = parser.parse_args()
     if args.output.exists() or args.output.with_suffix('.npz').exists() or not 3 <= args.seconds <= 60 or args.half_width <= 0:
@@ -64,11 +87,13 @@ def main():
     node = rclpy.create_node('near_lidar_readonly_audit')
     buffer = Buffer()
     listener = TransformListener(buffer, node)
-    topics = ('/livox/lidar', '/cloud_registered_body', '/obstacles/raw',
-              '/obstacles/deskewed', '/safety/remembered_obstacles')
+    topics = (('/utlidar/cloud', '/utlidar/cloud_base', '/utlidar/cloud_deskewed')
+              if args.unitree_only else ('/livox/lidar', '/cloud_registered_body', '/obstacles/raw',
+              '/obstacles/deskewed', '/safety/remembered_obstacles'))
     latest, arrivals, planes = {}, defaultdict(list), defaultdict(lambda: deque(maxlen=100))
     motion, errors, rows, processed = [], Counter(), defaultdict(list), {}
     snapshots = {}
+    clocks = defaultdict(list)
     status_history = deque(maxlen=200)
     target = 'base_link_3d'
     bins = ((0., .5), (.5, 1.), (1., 1.5), (1.5, 2.), (2., 3.))
@@ -76,6 +101,7 @@ def main():
     def cloud(message, topic):
         arrivals[topic].append(time.monotonic())
         latest[topic] = message
+        clocks[topic].append((stamp_ns(message)/1.e9, node.get_clock().now().nanoseconds/1.e9))
 
     def odom(message):
         p, v, w = message.pose.pose.position, message.twist.twist.linear, message.twist.twist.angular
@@ -97,11 +123,12 @@ def main():
             errors['invalid memory status JSON'] += 1
     node.create_subscription(String, '/safety/obstacle_memory_status', status, qos_profile_sensor_data)
     clients, queries = [], []
-    for name, parameters in (
+    parameter_queries = (
         ('laser_mapping', ['preprocess.blind', 'point_filter_num', 'preprocess.scan_line', 'preprocess.scan_rate']),
         ('livox_lidar_publisher', ['user_config_path', 'frame_id', 'xfer_format']),
         ('safety_pointcloud_to_laserscan', ['range_min', 'range_max', 'ground_clearance', 'obstacle_height_above_ground']),
-        ('pointcloud_to_laserscan_node', ['range_min', 'ground_clearance'])):
+        ('pointcloud_to_laserscan_node', ['range_min', 'ground_clearance']))
+    for name, parameters in (() if args.unitree_only else parameter_queries):
         client = node.create_client(GetParameters, '/'+name+'/get_parameters')
         clients.append(client)
         queries.append((name, parameters, client.call_async(GetParameters.Request(names=parameters))))
@@ -134,7 +161,16 @@ def main():
                             entry['center_elevation_deg_percentiles'] = np.percentile(np.degrees(np.arctan2(front[:, 2], np.hypot(front[:, 0], front[:, 1]))), [0, 1, 50, 99, 100]).tolist() if len(front) else None
                         if 'tag' in data.dtype.names:
                             entry['tag_histogram'] = {str(int(k)): int(v) for k, v in zip(*np.unique(data['tag'][valid], return_counts=True))}
-                    if message.header.frame_id != target:
+                    if args.unitree_only:
+                        # Native geometry is diagnostic only: a matching frame
+                        # NAME is not proof of calibration to the LIO body.
+                        p = source
+                        entry['coordinate_frame'] = message.header.frame_id
+                        entry['hap_alignment_validated'] = False
+                        radii = np.linalg.norm(source, axis=1)
+                        entry['native_radius_bins'] = {label: int(((radii>=low)&(radii<high)).sum())
+                            for label,low,high in [('5_20cm',.05,.20),('20_50cm',.20,.50),('50_100cm',.50,1.)]}
+                    elif message.header.frame_id != target:
                         tf = buffer.lookup_transform(target, message.header.frame_id, Time.from_msg(message.header.stamp))
                         t = tf.transform.translation
                         p = source @ rotation(tf.transform.rotation).T + [t.x, t.y, t.z]
@@ -175,16 +211,21 @@ def main():
                     errors[topic+': '+str(exc)] += 1
 
         report = {'time_utc': datetime.now(timezone.utc).isoformat(), 'label': args.label,
-            'duration_seconds': args.seconds, 'target_frame': target, 'half_width': args.half_width,
+            'duration_seconds': args.seconds, 'target_frame': 'native per topic' if args.unitree_only else target, 'half_width': args.half_width,
             'method': '5 Hz samples; message-stamped TF; independent topics; ground match <=150 ms; no target identity inference',
             'topics': {}, 'parameters': {}, 'samples': dict(rows), 'errors': dict(errors)}
         report['memory_status_history'] = list(status_history)
-        try:
-            mount = buffer.lookup_transform(target, 'livox_frame', Time()).transform
-            report['sensor_mount'] = {'xyz': [mount.translation.x, mount.translation.y, mount.translation.z],
-                'quaternion_xyzw': [mount.rotation.x, mount.rotation.y, mount.rotation.z, mount.rotation.w]}
-        except Exception as exc:
-            report['errors']['sensor mount unavailable: '+str(exc)] = 1
+        report['unitree_native_mode'] = args.unitree_only
+        report['clock_diagnostics'] = {topic: clock_diagnostics(samples) for topic,samples in clocks.items()}
+        if args.unitree_only:
+            report['method'] = '5 Hz independent native-frame samples; clock offset reported, not corrected; no calibration or target identity inference'
+        if not args.unitree_only:
+            try:
+                mount = buffer.lookup_transform(target, 'livox_frame', Time()).transform
+                report['sensor_mount'] = {'xyz': [mount.translation.x, mount.translation.y, mount.translation.z],
+                    'quaternion_xyzw': [mount.rotation.x, mount.rotation.y, mount.rotation.z, mount.rotation.w]}
+            except Exception as exc:
+                report['errors']['sensor mount unavailable: '+str(exc)] = 1
         for topic in topics:
             times = [t for t in arrivals[topic] if t >= warmup_end]
             topic_rows = rows[topic]
@@ -212,12 +253,14 @@ def main():
         report['snapshot_file'] = str(args.output.with_suffix('.npz'))
         np.savez_compressed(args.output.with_suffix('.npz'), **snapshots)
         args.output.write_text(json.dumps(report, indent=2, allow_nan=False)+'\n')
-        summary = {'output': str(args.output), 'motion': report['motion'], 'errors': report['errors']}
+        summary = {'output': str(args.output), 'motion': report['motion'], 'errors': report['errors'],
+                   'clock_diagnostics': report['clock_diagnostics']}
         summary['topics'] = {t: {'hz': s['hz'], 'sampled_frames': s['sampled_frames'],
             'bin_medians': [b['points_min_median_max'][1] for b in s['bins']]}
             for t, s in report['topics'].items()}
         print(json.dumps(summary, indent=2, allow_nan=False))
-        return 0 if all(rows[t] for t in topics[:4]) else 2
+        required = topics if args.unitree_only else topics[:4]
+        return 0 if all(rows[t] for t in required) else 2
     finally:
         node.destroy_node()
         rclpy.shutdown()

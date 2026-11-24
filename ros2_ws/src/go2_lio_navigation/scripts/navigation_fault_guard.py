@@ -44,6 +44,7 @@ class RetriedRequest:
 def main():
     rclpy.init();node=rclpy.create_node('navigation_fault_guard')
     code=node.declare_parameter('lio_exit_code',0).value
+    source=node.declare_parameter('localization_source','FAST-LIO').value
     latched=QoSProfile(depth=1,durability=DurabilityPolicy.TRANSIENT_LOCAL)
     valid=node.create_publisher(Bool,'/lio/localization_valid',latched)
     status=node.create_publisher(String,'/safety/navigation_fault',latched)
@@ -63,18 +64,20 @@ def main():
         status.publish(String(data=json.dumps({'state':'localization_stopped',
             'navigation_paused':pause_request.acknowledged,
             'navigation_cancelled':cancel_request.acknowledged,'lio_exit_code':code,
-            'message':f'FAST-LIO 定位已停止（退出码 {code}），导航已停车；查看定位日志确认原因，排除故障后重新启动。'})))
-        m=Marker();m.header.frame_id='map';m.header.stamp=node.get_clock().now().to_msg()
+            'message':f'{source} 定位已停止（退出码 {code}），导航已停车。请检查定位日志后重新启动。'})))
+        # Keep the warning beside the robot even after it has left map origin.
+        # Zero stamp intentionally uses the last known TF for a frozen display.
+        m=Marker();m.header.frame_id='base_link';m.frame_locked=True
         m.ns='navigation_fault';m.id=1;m.type=Marker.TEXT_VIEW_FACING;m.action=Marker.ADD
-        m.pose.position.z=.5;m.pose.orientation.w=1.;m.scale.z=.22
+        m.pose.position.x=.35;m.pose.position.z=.65;m.pose.orientation.w=1.;m.scale.z=.12
         m.color.r=1.;m.color.g=.15;m.color.b=.1;m.color.a=1.
-        m.text='LOCALIZATION STOPPED\nNavigation paused - check FAST-LIO error log'
+        m.text='LOCALIZATION STOPPED - MAP FROZEN\nNavigation paused - restart required'
         marker.publish(m)
         if steady-began>8. and not pause_request.acknowledged and not state['warning']:
             node.get_logger().error('Nav2 pause not acknowledged; localization motion gate remains closed')
             state['warning']=True
-    node.get_logger().error('FAST-LIO exited: motion is latched off; RViz and diagnostics remain open. '
-                            'Check the FAST-LIO error log, then restart the navigation launch.')
+    node.get_logger().error(f'{source} localization exited. Motion is latched off. '
+                            'Check the localization log, then restart navigation.')
     tick();node.create_timer(.5,tick)
     try:rclpy.spin(node)
     except (KeyboardInterrupt,ExternalShutdownException):pass

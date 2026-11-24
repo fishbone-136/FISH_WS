@@ -1,4 +1,4 @@
-"""HAP FAST-LIO2 online mapping, loop closure, 2.5-D terrain, and Nav2."""
+"""Online mapping, loop closure, 2.5-D terrain, and Nav2."""
 
 import fcntl
 import os
@@ -10,6 +10,7 @@ from launch.actions import (
     DeclareLaunchArgument,
     LogInfo,
     IncludeLaunchDescription,
+    OpaqueFunction,
     RegisterEventHandler,
     TimerAction,
 )
@@ -21,6 +22,7 @@ from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 from go2_navigation.runtime_guard import conflicting_navigation_processes
 from go2_navigation.safety_geometry import collision_monitor_parameters
+from go2_perception.unitree_cloud import TRANSLATION
 
 
 _instance_lock = None
@@ -41,6 +43,7 @@ def acquire_single_instance_lock():
         "ros2", "launch", "go2_lio_navigation",
         "go2_lio_navigation.launch.py",
     ]
+    domain = int(os.environ.get("ROS_DOMAIN_ID", "0"))
     for cmdline_path in Path("/proc").glob("[0-9]*/cmdline"):
         try:
             pid = int(cmdline_path.parent.name)
@@ -53,7 +56,15 @@ def acquire_single_instance_lock():
         except (OSError, ValueError):
             continue
         argv_names = [os.path.basename(argument) for argument in argv]
-        if all(token in argv_names for token in signature):
+        if not all(token in argv_names for token in signature):
+            continue
+        try:
+            environment = (cmdline_path.parent / "environ").read_bytes().split(b"\0")
+            process_domain = next((item.split(b"=", 1)[1] for item in environment
+                                   if item.startswith(b"ROS_DOMAIN_ID=")), b"0")
+        except OSError:
+            continue
+        if process_domain == str(domain).encode():
             raise RuntimeError(
                 f"go2_lio_navigation is already running (PID {pid}). "
                 "Stop the existing launch with Ctrl+C before starting another one."
@@ -65,7 +76,8 @@ def acquire_single_instance_lock():
             f"Navigation/gate processes still running (PIDs {conflicts}). "
             "Stop that session before starting a second stack.")
 
-    lock_path = f"/tmp/go2_lio_navigation_{os.getuid()}.lock"
+    domain_suffix = f"_{domain}" if domain else ""
+    lock_path = f"/tmp/go2_lio_navigation_{os.getuid()}{domain_suffix}.lock"
     try:
         if Path(lock_path).read_text(encoding="utf-8").strip() == str(os.getpid()):
             return
@@ -100,8 +112,24 @@ def typed_float(name):
     return ParameterValue(LaunchConfiguration(name), value_type=float)
 
 
-def generate_launch_description():
+def launch_collision_monitor(context, config):
+    geometry = collision_monitor_parameters(LaunchConfiguration("nav_params").perform(context))
+    return [Node(
+        package="nav2_collision_monitor", executable="collision_monitor",
+        name="collision_monitor", output="screen",
+        parameters=[config, {"use_sim_time": LaunchConfiguration("use_sim_time"), **geometry}],
+    )]
+
+
+def launch_stack(context):
     acquire_single_instance_lock()
+    source = LaunchConfiguration("lidar_source").perform(context)
+    unitree = source == "unitree"
+    sensor_frame = "unitree_lidar_aligned" if unitree else "livox_frame"
+    sensor_x = str(TRANSLATION[0]) if unitree else LaunchConfiguration("hap_x")
+    sensor_x_parameter = float(sensor_x) if unitree else typed_float("hap_x")
+    scan_period = "0.0666666667" if unitree else PythonExpression([
+        "1.0 / float('", LaunchConfiguration("hap_publish_freq"), "')"])
 
     share = get_package_share_directory("go2_lio_navigation")
     nav_share = get_package_share_directory("go2_navigation")
@@ -114,9 +142,8 @@ def generate_launch_description():
     use_sim_time = LaunchConfiguration("use_sim_time")
     enable_loop = LaunchConfiguration("enable_loop_closure")
 
-    hap = include("go2_perception", "livox_hap.launch.py", {
+    hap_args = {
         "start_driver": LaunchConfiguration("start_hap_driver"),
-        "config_path": LaunchConfiguration("hap_config_path"),
         "publish_freq": LaunchConfiguration("hap_publish_freq"),
         # PointCloud2 uses best-effort/latest-frame QoS in the local Livox
         # driver and still carries HAP's timestamp/tag/line fields.
@@ -129,9 +156,36 @@ def generate_launch_description():
         "roll": LaunchConfiguration("hap_roll"),
         "pitch": LaunchConfiguration("hap_pitch"),
         "yaw": LaunchConfiguration("hap_yaw"),
-    })
+    }
+    hap_config = LaunchConfiguration("hap_config_path").perform(context)
+    if hap_config:
+        hap_args["config_path"] = hap_config
+    if unitree:
+        sensor = Node(
+            package="tf2_ros", executable="static_transform_publisher",
+            name="base_to_unitree_lidar_tf",
+            arguments=["--x", sensor_x, "--frame-id", "base_link_3d",
+                       "--child-frame-id", sensor_frame],
+        )
+        front_end = Node(
+            package="go2_perception", executable="unitree_navigation_source.py",
+            name="unitree_navigation_source", output="screen",
+            parameters=[{"use_sim_time": use_sim_time}],
+            additional_env={"OPENBLAS_NUM_THREADS": "1", "OMP_NUM_THREADS": "1"},
+        )
+    else:
+        sensor = include("go2_perception", "livox_hap.launch.py", hap_args)
+        front_end = Node(
+            package="fast_lio", executable="fastlio_mapping", name="laser_mapping",
+            output="screen", parameters=[fast_lio_config, {
+                "use_sim_time": use_sim_time,
+                "preprocess.scan_rate": ParameterValue(PythonExpression([
+                    "int(float('", LaunchConfiguration("hap_publish_freq"), "'))"
+                ]), value_type=int),
+            }],
+        )
 
-    # go2_base remains the command/watchdog bridge only. FAST-LIO supplies /odom and TF.
+    # go2_base remains the command/watchdog bridge. The localization bridge owns TF.
     base = include("go2_core", "go2_base.launch.py", {
         "video_enable": LaunchConfiguration("video_enable"),
         "odom_source": "none",
@@ -149,18 +203,6 @@ def generate_launch_description():
         condition=IfCondition(LaunchConfiguration("enable_go2_base")),
     )
 
-    fast_lio = Node(
-        package="fast_lio",
-        executable="fastlio_mapping",
-        name="laser_mapping",
-        output="screen",
-        parameters=[fast_lio_config, {
-            "use_sim_time": use_sim_time,
-            "preprocess.scan_rate": ParameterValue(PythonExpression([
-                "int(float('", LaunchConfiguration("hap_publish_freq"), "'))"
-            ]), value_type=int),
-        }],
-    )
     bridge = Node(
         package="go2_lio_navigation",
         executable="lio_base_bridge",
@@ -190,7 +232,7 @@ def generate_launch_description():
             # Measured HAP/FAST-LIO scheduling gaps occasionally reach about
             # 1.3 s under full Nav2 + RViz load.  Keep a safety margin without
             # masking a genuine sensor loss for more than two seconds.
-            "input_timeout": 1.8,
+            "input_timeout": 0.35 if unitree else 1.8,
             # FAST-LIO makes a one-off height correction for several seconds
             # after the initial ikd-tree is built. Keep the motion gate closed
             # until that startup transient has settled; subsequent transient
@@ -204,12 +246,12 @@ def generate_launch_description():
             "cancel_navigation_on_motion_failure": True,
             "motion_execution_valid_topic": "/go2/motion_execution_valid",
             "clear_costmaps_on_invalid": True,
-            "base_to_sensor_x": typed_float("hap_x"),
-            "base_to_sensor_y": typed_float("hap_y"),
-            "base_to_sensor_z": typed_float("hap_z"),
-            "base_to_sensor_roll": typed_float("hap_roll"),
-            "base_to_sensor_pitch": typed_float("hap_pitch"),
-            "base_to_sensor_yaw": typed_float("hap_yaw"),
+            "base_to_sensor_x": sensor_x_parameter,
+            "base_to_sensor_y": 0.0 if unitree else typed_float("hap_y"),
+            "base_to_sensor_z": 0.0 if unitree else typed_float("hap_z"),
+            "base_to_sensor_roll": 0.0 if unitree else typed_float("hap_roll"),
+            "base_to_sensor_pitch": 0.0 if unitree else typed_float("hap_pitch"),
+            "base_to_sensor_yaw": 0.0 if unitree else typed_float("hap_yaw"),
         }],
     )
     loop = Node(
@@ -218,7 +260,11 @@ def generate_launch_description():
         name="scan_context_loop_closure",
         output="screen",
         condition=IfCondition(enable_loop),
-        parameters=[loop_config, {"use_sim_time": use_sim_time}],
+        parameters=[loop_config, {
+            "use_sim_time": use_sim_time,
+            "turn_revisits": unitree,
+            "sensor_forward_offset": float(sensor_x) if unitree else 0.0,
+        }],
     )
     identity_map_to_odom = Node(
         package="tf2_ros",
@@ -237,7 +283,8 @@ def generate_launch_description():
         name="traversability_mapper",
         output="screen",
         condition=IfCondition(LaunchConfiguration("enable_terrain")),
-        parameters=[terrain_config, {"use_sim_time": use_sim_time}],
+        parameters=[terrain_config, {"use_sim_time": use_sim_time,
+                                     "ray_origin_frame": sensor_frame if unitree else ""}],
     )
     environment = Node(
         package="go2_lio_navigation",
@@ -245,13 +292,14 @@ def generate_launch_description():
         name="environment_mapper",
         output="screen",
         condition=IfCondition(LaunchConfiguration("enable_environment_mapping")),
-        parameters=[environment_config, {"use_sim_time": use_sim_time}],
+        parameters=[environment_config, {"use_sim_time": use_sim_time,
+                                          "sensor_frame": sensor_frame}],
         additional_env={"OPENBLAS_NUM_THREADS": "1", "OMP_NUM_THREADS": "1"},
     )
 
-    # Use FAST-LIO's deskewed body-frame scan for 2-D obstacle extraction;
-    # the raw HAP PointCloud2 remains dedicated to the LIO front end.
+    # Use the selected front end's deskewed sensor-frame scan for modelled obstacles.
     perception = include("go2_perception", "go2_pointcloud_process.launch.py", {
+        "use_sim_time": use_sim_time,
         "cloud_topic": "/cloud_registered_body",
         "obstacle_points_topic": "/obstacles/deskewed",
         "ground_plane_topic": "/perception/deskewed_ground_plane",
@@ -259,7 +307,7 @@ def generate_launch_description():
         "target_frame": "base_link_3d",
         "scan_frame": "base_link",
         "level_scan": "true",
-        "fixed_cloud_frame": "livox_frame",
+        "fixed_cloud_frame": sensor_frame,
         # FAST-LIO publishes reliable clouds. Use one direct projection hop,
         # not two best-effort large-cloud transfers that dropped whole frames.
         "use_best_effort": "false",
@@ -267,15 +315,21 @@ def generate_launch_description():
         "projection_cloud_topic": "/cloud_registered_body",
         "accumulation_frames": "1",
         "ground_filter_enabled": "true",
+        "require_ground_for_scan": "true",
         "observed_free_space_only": "true",
         "cloud_min_height": LaunchConfiguration("cloud_min_height"),
         "cloud_max_height": LaunchConfiguration("cloud_max_height"),
-        "scan_period": PythonExpression([
-            "1.0 / float('", LaunchConfiguration("hap_publish_freq"), "')"]),
+        "scan_period": scan_period,
+        **({
+            "scan_mirror_topic": "/scan_safety",
+            "obstacle_mirror_topic": "/obstacles/raw",
+            "ground_mirror_topic": "/perception/raw_ground_plane",
+        } if unitree else {}),
     }, condition=IfCondition(LaunchConfiguration("enable_perception")))
-    # A current raw frame reaches braking without waiting for ICP/map insertion.
-    # Keep deskewed /scan for global geometry; local avoidance uses this lane.
+    # HAP has a separate raw lane. Unitree's direct raw near guard still runs
+    # independently, while Nav2 and obstacle memory share one projection.
     fast_perception = include("go2_perception", "go2_pointcloud_process.launch.py", {
+        "use_sim_time": use_sim_time,
         "cloud_topic": "/livox/lidar",
         "projection_cloud_topic": "/livox/lidar",
         "scan_topic": "/scan_safety",
@@ -289,10 +343,10 @@ def generate_launch_description():
         "enable_accumulation": "false",
         "use_best_effort": "true",
         "ground_filter_enabled": "true",
+        "require_ground_for_scan": "true",
         "observed_free_space_only": "true",
-        "scan_period": PythonExpression([
-            "1.0 / float('", LaunchConfiguration("hap_publish_freq"), "')"]),
-    }, condition=IfCondition(LaunchConfiguration("enable_perception")))
+        "scan_period": scan_period,
+    }, condition=IfCondition(LaunchConfiguration("enable_perception"))) if not unitree else None
     nav2 = include("go2_navigation", "go2_nav2.launch.py", {
         "use_sim_time": use_sim_time,
         "params_file": LaunchConfiguration("nav_params"),
@@ -300,6 +354,7 @@ def generate_launch_description():
         "mapping_mode": "true",
         "terrain_mode": LaunchConfiguration("terrain_mode"),
         "lio_mode": "true",
+        "sensor_x": sensor_x,
         "controller_mode": LaunchConfiguration("controller_mode"),
         "use_composition": LaunchConfiguration("nav2_use_composition"),
         "log_level": LaunchConfiguration("nav2_log_level"),
@@ -308,20 +363,25 @@ def generate_launch_description():
         package="go2_lio_navigation", executable="scan_safety_gate.py",
         name="scan_safety_gate", output="screen",
         condition=IfCondition(LaunchConfiguration("enable_nav2")),
-        parameters=[{"use_sim_time": use_sim_time}],
+        parameters=[{"use_sim_time": use_sim_time,
+                     "nav_params": LaunchConfiguration("nav_params"),
+                     "lidar_source": source,
+                     "motion_enabled": ParameterValue(LaunchConfiguration("enable_go2_base"),
+                                                       value_type=bool),
+                     "unitree_near_required": True,
+                     "raw_sensor_x": sensor_x_parameter}],
     )
     obstacle_memory = Node(
         package="go2_lio_navigation", executable="obstacle_memory.py",
         name="obstacle_memory", output="screen",
         condition=IfCondition(LaunchConfiguration("enable_nav2")),
-        parameters=[{"use_sim_time": use_sim_time,"body_frame":"base_link_3d"}],
+        parameters=[{"use_sim_time": use_sim_time,"body_frame":"base_link_3d",
+                     "lidar_source": source,
+                     "global_navigation_resolution": 0.04}],
     )
-    collision_monitor = Node(
-        package="nav2_collision_monitor", executable="collision_monitor",
-        name="collision_monitor", output="screen",
+    collision_monitor = OpaqueFunction(
+        function=launch_collision_monitor, args=[collision_config],
         condition=IfCondition(LaunchConfiguration("enable_nav2")),
-        parameters=[collision_config, {"use_sim_time": use_sim_time,
-            **collision_monitor_parameters(os.path.join(nav_share, "config", "nav2_params.yaml"))}],
     )
     collision_manager = Node(
         package="nav2_lifecycle_manager", executable="lifecycle_manager",
@@ -346,20 +406,35 @@ def generate_launch_description():
     )
     def localization_exited(event,context):
         if context.is_shutdown:return []
-        return [LogInfo(msg='LOCALIZATION FAULT: FAST-LIO stopped. RViz remains open; '
-                         'check the FAST-LIO error log before restarting navigation.'),
+        return [LogInfo(msg=f'LOCALIZATION FAULT: {source} source stopped. '
+                         'Check the localization log before restarting navigation.'),
                 Node(package='go2_lio_navigation',executable='navigation_fault_guard.py',
                      name='navigation_fault_guard',output='screen',
-                     parameters=[{'use_sim_time':use_sim_time,'lio_exit_code':event.returncode}])]
+                     parameters=[{'use_sim_time':use_sim_time,'lio_exit_code':event.returncode,
+                                  'localization_source': 'Unitree' if unitree else 'FAST-LIO'}])]
 
-    stop_on_fast_lio_exit = RegisterEventHandler(
+    stop_on_localization_exit = RegisterEventHandler(
         OnProcessExit(
-            target_action=fast_lio,
+            target_action=front_end,
             on_exit=localization_exited,
         )
     )
 
+    return [
+        stop_on_localization_exit, sensor, base, idle_stand,
+        TimerAction(period=1.0, actions=[front_end, bridge, loop, identity_map_to_odom]),
+        TimerAction(period=3.0, actions=[perception, terrain, environment] +
+                    ([fast_perception] if fast_perception else [])),
+        TimerAction(period=6.0, actions=[nav2]),
+        collision_monitor, collision_manager, obstacle_memory, scan_gate, terrain_display, rviz,
+    ]
+
+
+def generate_launch_description():
+    share = get_package_share_directory("go2_lio_navigation")
+    nav_share = get_package_share_directory("go2_navigation")
     return LaunchDescription([
+        DeclareLaunchArgument("lidar_source", default_value="unitree", choices=["unitree", "hap"]),
         DeclareLaunchArgument("use_sim_time", default_value="false"),
         DeclareLaunchArgument("use_rviz", default_value="false"),
         DeclareLaunchArgument(
@@ -383,13 +458,8 @@ def generate_launch_description():
             "terrain_mode", default_value="indoor",
             choices=["indoor", "outdoor", "gravel"]),
         DeclareLaunchArgument("cmd_vel_timeout", default_value="0.5"),
-        DeclareLaunchArgument("hap_publish_freq", default_value="15.0"),
-        DeclareLaunchArgument(
-            "hap_config_path",
-            default_value=os.path.join(
-                get_package_share_directory("livox_ros_driver2"),
-                "config", "HAP_config.json"),
-        ),
+        DeclareLaunchArgument("hap_publish_freq", default_value="20.0"),
+        DeclareLaunchArgument("hap_config_path", default_value=""),
         DeclareLaunchArgument("hap_x", default_value="0.14"),
         DeclareLaunchArgument("hap_y", default_value="0.0"),
         DeclareLaunchArgument("hap_z", default_value="0.13"),
@@ -404,12 +474,5 @@ def generate_launch_description():
             "nav_params",
             default_value=os.path.join(nav_share, "config", "nav2_params.yaml"),
         ),
-        stop_on_fast_lio_exit,
-        hap,
-        base,
-        idle_stand,
-        TimerAction(period=1.0, actions=[fast_lio, bridge, loop, identity_map_to_odom]),
-        TimerAction(period=3.0, actions=[perception, fast_perception, terrain, environment]),
-        TimerAction(period=6.0, actions=[nav2]),
-        collision_monitor, collision_manager, obstacle_memory, scan_gate, terrain_display, rviz,
+        OpaqueFunction(function=launch_stack),
     ])

@@ -93,7 +93,9 @@ class Dashboard(QMainWindow):
         if index == self.pages.currentIndex():
             return
         if index == 1:
-            self.main_panel.enter_safe_idle()
+            if self.main_panel.enter_safe_idle() is False:
+                self.main_panel.log_top.append('正在停止人体跟随，请稍后再进入导航。')
+                return
             if self._near_session is not None and self._near_session.active:
                 self.main_panel.on_visual_navigation_update('notice', 'SDK 视觉任务仍在退出，请稍后再进入导航。')
                 return
@@ -228,6 +230,9 @@ class Dashboard(QMainWindow):
             self.size_grip.setVisible(not self.isMaximized())
 
     def closeEvent(self, event):
+        if not self.main_panel.prepare_close():
+            event.ignore()
+            return
         self._cancel_visual_move()
         if self._near_session is not None and self._near_session.active:
             event.ignore()

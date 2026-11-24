@@ -11,6 +11,15 @@ spec.loader.exec_module(module)
 
 
 class ForwardObservationTests(unittest.TestCase):
+    def test_hardware_blind_outline_is_a_half_metre_forward_sector(self):
+        points=module.lidar_blind_outline()
+        self.assertEqual(points[0],(0.,0.))
+        self.assertEqual(points[-1],(0.,0.))
+        for x,y in points[1:-1]:
+            self.assertGreaterEqual(x,0.)
+            self.assertAlmostEqual((x*x+y*y)**.5,.5)
+        self.assertAlmostEqual(max(x for x,y in points),.5)
+
     def test_startup_has_no_fabricated_forward_coverage(self):
         window = module.ForwardObservationWindow()
         window.observe(0, 10., 20.)

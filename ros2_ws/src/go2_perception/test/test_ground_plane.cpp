@@ -155,3 +155,28 @@ TEST(ReferencedGround, LaggedAttitudeUsesMeasuredFloorWithoutAdmittingRaisedPlan
   tracker.observe(raised,10.27,points,Eigen::Matrix3d::Identity(),translation);
   EXPECT_FALSE(tracker.supported());
 }
+
+TEST(ReferencedGround, RejectsAPlaneAtBodyHeightAndRecoversWhenStanding)
+{
+  using pointcloud_to_laserscan::ReferencedGroundTracker;
+  ReferencedGroundTracker tracker;
+  const auto rotation = Eigen::Matrix3d::Identity();
+  const Eigen::Vector3d standing(0., 0., .35), crouched(0., 0., .02);
+  const GroundPlane floor{{0., 0., 1.}, .35, true};
+  std::vector<Eigen::Vector3d> points;
+  for (double x = .6; x < 3.; x += .12) {
+    for (double y = -1.; y < 1.; y += .12) {
+      points.emplace_back(x, y, -.35);
+    }
+  }
+  for (int i = 0; i < 3; ++i) {
+    tracker.observe(floor, 10. + .1 * i, points, rotation, standing);
+  }
+  ASSERT_TRUE(tracker.supported());
+  for (auto & point : points) {point.z() = -.02;}
+  EXPECT_FALSE(tracker.observe({}, 10.3, points, rotation, crouched).valid);
+  EXPECT_FALSE(tracker.supported());
+  for (auto & point : points) {point.z() = -.35;}
+  EXPECT_TRUE(tracker.observe(floor, 10.4, points, rotation, standing).valid);
+  EXPECT_TRUE(tracker.supported());
+}

@@ -203,6 +203,22 @@ class ReactiveSafetyTests(unittest.TestCase):
         self.assertLess(safe_speed,.3)
         self.assertEqual(braking_speed_scale(points,safe_speed,0.,0.,.51,.33,.05), 1.)
 
+    def test_35cm_body_passes_50cm_corridor_but_stops_for_crossing_person(self):
+        walls = [(float(x), side*.25) for x in (.2, .4, .6, 1., 1.5, 2.)
+                 for side in (-1, 1)]
+        # Overlapping 30 cm soft costmap inflation does not enlarge this
+        # independent 35 cm physical execution envelope.
+        front, width = .38, .175
+        self.assertTrue(module.stop_zone_clear(walls, front, front, width))
+        speed = .45*module.close_clearance_scale(walls, .45, 0., 0., front, width)
+        self.assertGreaterEqual(speed, .22)
+        self.assertTrue(turn_is_clear(walls, speed, 0., 0., front, width, 1.7))
+        guard = module.ClosingApproach(stop_front=front)
+        guard.observe(walls, 10.)
+        self.assertEqual(guard.scale(speed, 10.05, path_half_width=width), 1.)
+        guard.observe(walls+[(.30, 0.)], 10.1)
+        self.assertEqual(guard.scale(speed, 10.12, path_half_width=width), 0.)
+
     def test_braking_extent_grows_with_speed_and_retains_the_scan_age_margin(self):
         low = .51+.18*braking_horizon(.18,0.,0.,.08)
         high = .51+.55*braking_horizon(.55,0.,0.,.08)
@@ -217,6 +233,19 @@ class ReactiveSafetyTests(unittest.TestCase):
         points=[(.4,.42)]
         self.assertFalse(turn_is_clear(points,0.,0.,.3,.51,.33,1.5))
         self.assertEqual(braking_speed_scale(points,0.,0.,.3,.51,.33,.03),1.)
+
+    def test_turn_recovery_stops_immediately_and_ignores_short_clear_windows(self):
+        hold = module.TurnRecoveryHold()
+        self.assertTrue(hold.allows(turning=True, permitted=True, now=1.00))
+        self.assertFalse(hold.allows(turning=True, permitted=False, now=1.01))
+        self.assertFalse(hold.allows(turning=True, permitted=True, now=1.02))
+        self.assertFalse(hold.allows(turning=True, permitted=True, now=1.10))
+        self.assertFalse(hold.allows(turning=True, permitted=False, now=1.11))
+        self.assertFalse(hold.allows(turning=True, permitted=True, now=1.12))
+        self.assertTrue(hold.allows(turning=True, permitted=True, now=1.23))
+        self.assertFalse(hold.allows(turning=True, permitted=False, now=1.24))
+        self.assertTrue(hold.allows(turning=False, permitted=True, now=1.25))
+        self.assertFalse(hold.allows(turning=True, permitted=True, now=1.50))
 
 
 if __name__ == '__main__': unittest.main()

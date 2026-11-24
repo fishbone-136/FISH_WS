@@ -68,36 +68,40 @@ class DynamicObstacles:
         clusters=[]
         def compact(mask):
             cloud=points[mask]
-            if len(cloud)<8:return None
+            # A close leg may contain only a handful of returns. Require
+            # measured width AND height plus the existing multi-frame motion
+            # confirmation; a single thin static pole still cannot qualify.
+            if len(cloud)<4:return None
             extent=np.ptp(cloud[:,:2],axis=0)
-            if not .15<=max(extent)<=1.2 or np.ptp(cloud[:,2])<.12:return None
+            if not .10<=max(extent)<=1.2 or np.ptp(cloud[:,2])<.12:return None
             cells=set(map(tuple,keys[mask].tolist()))
             center=.5*(cloud[:,:2].min(axis=0)+cloud[:,:2].max(axis=0))
             return center,extent,cells
 
         recent=np.fromiter((stamp-self.first_seen[k]<3. or k in self.dynamic_cells
                             for k in key_tuples),bool,count=len(keys))
-        for group in np.unique(point_labels):
-            mask=point_labels==group
+        order = np.argsort(point_labels, kind='stable')
+        splits = np.flatnonzero(np.diff(point_labels[order])) + 1
+        for group_indices in np.split(order, splits):
+            if len(group_indices) < 4:
+                continue
             # A person passing next to a box/wall can merge with it in XY.
             # Split recently appearing geometry away from established static
             # returns before tracking; otherwise changing combined dimensions
             # repeatedly restart the track and leave untagged body trails.
-            young=mask&recent
-            if np.count_nonzero(mask&~recent)>=8 and np.count_nonzero(young)>=8:
+            young = group_indices[recent[group_indices]]
+            if len(group_indices) - len(young) >= 8 and len(young) >= 8:
                 fg=np.zeros(tuple(size),dtype=bool)
                 fg[indices[young,0],indices[young,1]]=True
                 groups,_=label(fg,structure=np.ones((3,3),dtype=bool))
-                foreground=groups[indices[:,0],indices[:,1]]
-                separated=[compact(young&(foreground==v)) for v in np.unique(foreground[young])]
+                foreground=groups[indices[young,0],indices[young,1]]
+                separated=[compact(young[foreground==v]) for v in np.unique(foreground)]
                 separated=[v for v in separated if v is not None]
                 if separated:
                     clusters.extend(separated)
                     continue
-            cloud=points[mask]
-            if len(cloud)<8:continue
             # A single thin leg and long walls never become moving objects.
-            cluster=compact(mask)
+            cluster=compact(group_indices)
             if cluster is not None:clusters.append(cluster)
         used=set();claimed=set()
         for center,extent,cells in clusters:
@@ -177,6 +181,15 @@ class DynamicObstacles:
         self.untracked_landmarks={k:v for k,v in self.untracked_landmarks.items() if k in memory}
         self.tracked_seen.intersection_update(memory)
 
+    def forget_cells(self, keys):
+        for key in keys:
+            self.dynamic_cells.pop(key, None)
+            self.first_seen.pop(key, None)
+            self.support_history.pop(key, None)
+            self.static_confirmed.pop(key, None)
+            self.untracked_landmarks.pop(key, None)
+        self.tracked_seen.difference_update(keys)
+
     def flags(self,keys):
         return np.fromiter((k in self.dynamic_cells for k in keys),bool,count=len(keys))
 
@@ -190,8 +203,11 @@ class DynamicObstacles:
         candidates=[]
         for i,key in enumerate(keys):
             history=self.support_history.get(key)
+            # Near HAP returns can hit a passing fragment six times before
+            # the one-second static confirmation. Packet count is not proof
+            # of a landmark: keep grouped fragments eligible until confirmed.
             if (key not in self.static_confirmed and history is not None and
-                    history[1]-history[0]<=.60 and history[2]<6 and key in memory):
+                    history[1]-history[0]<=1.5 and key in memory):
                 candidates.append(i)
         if len(candidates)<4:return result
         xy=np.asarray([memory[keys[i]][:2] for i in candidates])
@@ -200,10 +216,12 @@ class DynamicObstacles:
         pairs=cKDTree(xy).query_pairs(.12,output_type='ndarray')
         graph=csr_matrix((np.ones(len(pairs),dtype=bool),(pairs[:,0],pairs[:,1])),
                          shape=(len(xy),len(xy)))
-        _,identities=connected_components(graph,directed=False)
-        candidates=np.asarray(candidates)
-        for identity in np.unique(identities):
-            selected=np.flatnonzero(identities==identity)
-            if len(selected)>=4 and np.max(np.ptp(xy[selected],axis=0))>=.15:
-                result[candidates[selected]]=True
+        components, identities = connected_components(graph, directed=False)
+        lower = np.full((components, 2), np.inf)
+        upper = np.full((components, 2), -np.inf)
+        np.minimum.at(lower, identities, xy)
+        np.maximum.at(upper, identities, xy)
+        wide = np.max(upper - lower, axis=1) >= .15
+        grouped = wide & (np.bincount(identities, minlength=components) >= 4)
+        result[candidates] = grouped[identities]
         return result

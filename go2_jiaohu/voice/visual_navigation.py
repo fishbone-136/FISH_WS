@@ -31,6 +31,7 @@ class RgbdSnapshot:
     captured_at: float  # system time, paired with the ROS system clock
     captured_monotonic: float
     deproject: Callable  # (u, v, depth_m) -> optical (x right, y down, z forward)
+    deproject_many: Callable | None = None  # optional cached, calibrated batch projection
 
 
 @dataclass(frozen=True)

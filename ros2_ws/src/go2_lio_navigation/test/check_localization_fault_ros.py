@@ -31,6 +31,7 @@ def main():
     node.create_subscription(Bool,'/lio/localization_valid',lambda m:received.update(valid=m.data),qos)
     node.create_subscription(Marker,'/safety/navigation_fault_marker',lambda m:received.update(marker=m),qos)
     process=subprocess.Popen(['ros2','launch','go2_lio_navigation','go2_lio_navigation.launch.py',
+        'lidar_source:=hap',
         'start_hap_driver:=false','enable_go2_base:=false','use_rviz:=false','enable_nav2:=false',
         'enable_terrain:=false','enable_perception:=false','enable_loop_closure:=false',
         'enable_environment_mapping:=false'],start_new_session=True)

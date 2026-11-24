@@ -22,12 +22,20 @@ def _include_nav2(context, nav_to_pose_bt, nav_to_pose_mppi_bt):
     acquire_navigation_lock()
     terrain_mode = LaunchConfiguration('terrain_mode').perform(context)
     controller_mode = LaunchConfiguration('controller_mode').perform(context).lower()
+    lio_mode = LaunchConfiguration('lio_mode').perform(context).lower() == 'true'
     selected_bt = nav_to_pose_mppi_bt if controller_mode == 'mppi' else nav_to_pose_bt
     selected_controller = 'FollowPathMPPI' if controller_mode == 'mppi' else 'FollowPath'
-    if LaunchConfiguration('lio_mode').perform(context).lower() == 'true':
+    if lio_mode:
         tree = ET.parse(selected_bt)
         for item in tree.iter('LatestGoalPose'):
             item.set('anchor_frame', 'odom_lio')
+        tree.find('.//RateController').set('hz', '4.0')
+        recovery = tree.find(".//RecoveryNode[@name='NavigateRecovery']")
+        # Check the rebuilt map sooner while keeping the tree's retry limit.
+        fallback = recovery.find('ReactiveFallback')
+        fallback.remove(fallback.find('Wait'))
+        delay = ET.SubElement(fallback, 'Delay', delay_msec='400')
+        ET.SubElement(delay, 'AlwaysSuccess')
         with tempfile.NamedTemporaryFile(mode='wb', prefix='go2_anchored_goal_',
                                          suffix='.xml', delete=False) as stream:
             tree.write(stream, encoding='utf-8', xml_declaration=True)
@@ -38,12 +46,39 @@ def _include_nav2(context, nav_to_pose_bt, nav_to_pose_mppi_bt):
         selected_params = yaml.safe_load(stream)
     selected_params['controller_server']['ros__parameters']['controller_plugins'] = [
         selected_controller]
-    # Point planning remains unchanged. Candidate execution checks use the
-    # SAME configured execution geometry as scan_safety_gate, before scoring.
-    if LaunchConfiguration('lio_mode').perform(context).lower() == 'true':
+    # Candidate checks and global clearance share the configured physical body.
+    # Local trajectory scoring still uses points plus exact execution arcs.
+    if lio_mode:
         front, rear, half_width = configured_protection(
             LaunchConfiguration('params_file').perform(context))
+        # Smac2D uses the inscribed radius for 2D collision costs. A zero
+        # global radius can route directly beside a person where the final
+        # rectangular gate must stop. Only the existing physical width becomes
+        # a hard band; the 18 cm outer inflation remains a soft preference.
+        global_map = selected_params['global_costmap']['global_costmap']['ros__parameters']
+        global_map['footprint'] = str([
+            [front, half_width], [front, -half_width],
+            [-rear, -half_width], [-rear, half_width]])
+        global_map['footprint_padding'] = 0.0
+        # Preserve a usable centreline between 50 cm walls after the 35 cm
+        # hard clearance band is rasterized, even when the walls straddle cells.
+        global_map['resolution'] = 0.04
         controller = selected_params['controller_server']['ros__parameters'][selected_controller]
+        if controller_mode == 'dwb':
+            # The immediate path can turn away from the final goal to pass a
+            # person. Prefer tracking that detour to closing the goal distance.
+            controller.update({
+                'angular_dist_threshold': 0.55,
+                'corridor_alignment': True,
+                'corridor_max_width': 0.70,
+                'PathAlign.forward_point_distance': 0.45,
+                'PathAlign.scale': 16.0,
+                'PathDist.scale': 24.0,
+                'GoalDist.scale': 12.0,
+            })
+        # Keep action polling from consuming most of a 250 ms replan period.
+        selected_params['bt_navigator']['ros__parameters']['bt_loop_duration'] = 50
+        selected_params['planner_server']['ros__parameters']['expected_planner_frequency'] = 4.0
         controller.update({
             'execution_safety.enabled': True,
             'execution_safety.point_model': (front, rear, half_width) == (0., 0., 0.),
@@ -51,6 +86,7 @@ def _include_nav2(context, nav_to_pose_bt, nav_to_pose_mppi_bt):
             'execution_safety.body_rear': rear,
             'execution_safety.body_half_width': half_width,
             'execution_safety.minimum_translation': controller.get('gait_min_translation', .22),
+            'execution_safety.raw_sensor_x': float(LaunchConfiguration('sensor_x').perform(context)),
         })
     with tempfile.NamedTemporaryFile(mode='w', prefix='go2_selected_controller_',
                                      suffix='.yaml', delete=False) as stream:
@@ -72,7 +108,7 @@ def _include_nav2(context, nav_to_pose_bt, nav_to_pose_mppi_bt):
     if uses_rough_terrain_navigation(terrain_mode):
         rewrites.update(outdoor_nav2_rewrites())
 
-    if LaunchConfiguration('lio_mode').perform(context).lower() == 'true':
+    if lio_mode:
         # FAST-LIO owns the continuous local frame. Loop closure only changes
         # map->odom_lio, so the local controller never receives a pose jump.
         rewrites.update({
@@ -83,7 +119,9 @@ def _include_nav2(context, nav_to_pose_bt, nav_to_pose_mppi_bt):
             'global_costmap.global_costmap.ros__parameters.global_frame': 'odom_lio',
             'bt_navigator.ros__parameters.global_frame': 'odom_lio',
             'global_costmap.global_costmap.ros__parameters.rolling_window': 'true',
-            # React to moving obstacles without waiting for the deskew/map path.
+            # Both planners see the current raw scan, without a deskew/map delay.
+            'global_costmap.global_costmap.ros__parameters.obstacle_layer.scan.topic':
+                '/scan_safety',
             'local_costmap.local_costmap.ros__parameters.obstacle_layer.scan.topic':
                 '/scan_safety',
             'local_costmap.local_costmap.ros__parameters.traversability_layer.enabled': 'true',
@@ -105,6 +143,13 @@ def _include_nav2(context, nav_to_pose_bt, nav_to_pose_mppi_bt):
                     'go2_navigation::CurrentObstacleLayer',
                 'local_costmap.local_costmap.ros__parameters.obstacle_layer.scan.clearing': 'false',
                 'global_costmap.global_costmap.ros__parameters.obstacle_layer.scan.clearing': 'false',
+                # Nav2 treats zero as "keep the last scan indefinitely". Match
+                # the LIO safety scan timeout so a stalled source stops adding
+                # old marks. Persistent geometry remains in obstacle_memory.
+                'local_costmap.local_costmap.ros__parameters.obstacle_layer.scan.observation_persistence': '0.25',
+                'global_costmap.global_costmap.ros__parameters.obstacle_layer.scan.observation_persistence': '0.25',
+                'local_costmap.local_costmap.ros__parameters.obstacle_layer.scan.expected_update_rate': '0.25',
+                'global_costmap.global_costmap.ros__parameters.obstacle_layer.scan.expected_update_rate': '0.25',
                 'local_costmap.local_costmap.ros__parameters.traversability_layer.map_topic':
                     '/safety/navigation_local',
                 'global_costmap.global_costmap.ros__parameters.static_layer.map_topic':
@@ -194,6 +239,11 @@ def generate_launch_description():
     ld.add_action(DeclareLaunchArgument(
         'lio_mode', default_value='false',
         description='Use odom_lio, traversability grids, and SmacPlanner2D'))
+    ld.add_action(DeclareLaunchArgument(
+        'hap_x', default_value='0.14', description='HAP x position in base_link (metres)'))
+    ld.add_action(DeclareLaunchArgument(
+        'sensor_x', default_value=LaunchConfiguration('hap_x'),
+        description='Active LiDAR x position in base_link (metres)'))
     ld.add_action(DeclareLaunchArgument(
         'controller_mode', default_value='dwb', choices=['dwb', 'mppi'],
         description='Primary local controller behind RotationShim'))

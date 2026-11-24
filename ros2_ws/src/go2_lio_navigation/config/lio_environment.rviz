@@ -19,7 +19,7 @@ Visualization Manager:
   Displays:
   - Class: rviz_default_plugins/Marker
     Enabled: true
-    Name: Navigation Fault - Stop and Check Connection
+    Name: Safety Status and LiDAR Visibility
     Namespaces: {}
     Topic:
       Depth: 1

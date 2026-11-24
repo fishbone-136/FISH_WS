@@ -67,11 +67,15 @@ install(TARGETS go2_stable_rotation_shim LIBRARY DESTINATION lib)
 
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
+  ament_add_gtest(test_global_detour test/test_global_detour.cpp)
+  ament_target_dependencies(test_global_detour nav2_core nav2_costmap_2d nav2_util pluginlib tf2_ros)
+  add_dependencies(test_global_detour go2_exact_goal_smac)
   ament_add_gtest(test_motion_geometry test/test_motion_geometry.cpp)
   target_include_directories(test_motion_geometry PRIVATE include)
   ament_target_dependencies(test_motion_geometry nav2_costmap_2d)
   ament_add_gtest(test_gait_safety_critic test/test_gait_safety_critic.cpp)
-  ament_target_dependencies(test_gait_safety_critic dwb_core nav2_costmap_2d nav2_util pluginlib)
+  target_include_directories(test_gait_safety_critic PRIVATE include)
+  ament_target_dependencies(test_gait_safety_critic dwb_core nav2_costmap_2d nav2_util pluginlib sensor_msgs)
   add_dependencies(test_gait_safety_critic go2_gait_safety_critic)
   ament_add_gtest(test_gait_trajectory_generator test/test_gait_trajectory_generator.cpp)
   ament_target_dependencies(test_gait_trajectory_generator dwb_core dwb_plugins nav2_util pluginlib)
@@ -86,7 +90,8 @@ if(BUILD_TESTING)
   ament_target_dependencies(test_latest_goal_bt
     behaviortree_cpp_v3 rclcpp tf2_ros tf2_geometry_msgs)
   target_compile_definitions(test_latest_goal_bt PRIVATE
-    LATEST_GOAL_PLUGIN="$<TARGET_FILE:go2_latest_goal_bt_node>")
+    LATEST_GOAL_PLUGIN="$<TARGET_FILE:go2_latest_goal_bt_node>"
+    OBSTACLE_WAIT_BT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/config")
   add_dependencies(test_latest_goal_bt go2_latest_goal_bt_node)
 endif()
 

@@ -22,13 +22,15 @@ class ClearingLatencyTests(unittest.TestCase):
         memory.mark_xyz([[1.,0.,.2]],(0.,0.,0.),8.)
         node=SimpleNamespace(
             memory=memory,localized=True,fault=None,clearing=None,
+            cpu_budget=SimpleNamespace(sample=lambda:None, overloaded=False),
             clearing_result_max_age=1.5,clearing_reset_stamp=9.,
             last_observation_stamp=9.,clearing_observation_resets=0,
             last_clearing_stamp=9.,last_clearing_result_age=None,
-            next_clearing=math.inf,clearing_rate=6.,clearing_jobs=0,
+            next_clearing=math.inf,next_far_clearing=0.,near_priority_jobs=0,near_pass_due=False,
+            clearing_rate=6.,clearing_jobs=0,
             clearing_removed=0,stale_clearing_results=0,
             max_processing_ms=0.,ray_failures=0,occupancy_revision=0,
-            motion=Mock(),publish_points=Mock(),publish_maps=Mock(),
+            motion=Mock(dynamic_cells={}),publish_points=Mock(),publish_maps=Mock(),
             publish_clear_volumes=Mock(),clearing_ground=None,
             processed=deque(),worker=Mock(),clouds={},ground_planes={},
             observation_transform=Mock())
@@ -36,6 +38,29 @@ class ClearingLatencyTests(unittest.TestCase):
         node.get_clock=lambda:SimpleNamespace(now=lambda:SimpleNamespace(
             nanoseconds=int(node.now*1.e9)))
         return node
+
+    def test_reference_clear_is_retried_after_measured_ground_recovers(self):
+        from unittest.mock import patch
+        node=self.fixture()
+        node.deferred_reference_clears=deque()
+        node.frame='odom_lio'
+        node.clear_pub=Mock()
+        node.publish_clear_volumes=lambda cells,ground,stamp: RememberedObstacles.publish_clear_volumes(node,cells,ground,stamp)
+        cells=[(.65,0.,9.,None,0,.10,.60)]
+        node.publish_clear_volumes(cells,None,9.8)
+        self.assertEqual(len(node.deferred_reference_clears),1)
+        node.clear_pub.publish.assert_not_called()
+        key=(10,0)
+        node.full_poses={key:object()}
+        node.ground_planes={key:SimpleNamespace(header=object())}
+        node.now=10.1
+        with patch('obstacle_memory.world_ground_plane',return_value=[0.,0.,1.,0.]):
+            RememberedObstacles.flush_reference_clears(node)
+        self.assertFalse(node.deferred_reference_clears)
+        node.clear_pub.publish.assert_called_once()
+        message=node.clear_pub.publish.call_args.args[0]
+        self.assertAlmostEqual(message.header.stamp.sec+message.header.stamp.nanosec/1.e9,9.8)
+        self.assertEqual(message.width,1)
 
     def finish(self,node,stamp,age,updates,snapshot):
         node.now=stamp+age
@@ -109,12 +134,31 @@ class ClearingLatencyTests(unittest.TestCase):
                 RememberedObstacles.update_clearing(node)
                 self.assertEqual(node.worker.submit.called,dispatched)
 
+    def test_overdue_far_job_cannot_skip_its_reserved_near_pass(self):
+        for near_present in (True, False):
+            with self.subTest(near_present=near_present):
+                node=self.fixture();node.next_clearing=0.;node.near_pass_due=True
+                if not near_present:
+                    node.memory.cells.clear()
+                node.memory.mark_xyz([[3.,0.,.2]],(0.,0.,0.),9.)
+                scan=PointCloud2();scan.header.stamp.sec=10
+                node.processed.append((scan,(0.,0.,0.)))
+                node.clouds[(10,0)]=scan
+                node.observation_transform.return_value=SimpleNamespace(transform=
+                    SimpleNamespace(translation=SimpleNamespace(x=0.,y=0.,z=.2)))
+                node.now=10.1
+                RememberedObstacles.update_clearing(node)
+                self.assertEqual(list(node.clearing_context[0]),
+                                 [(20,0)] if near_present else [(60,0)])
+                self.assertEqual(node.near_priority_jobs, int(near_present))
+                self.assertEqual(node.near_pass_due, not near_present)
+
     def test_unmeasured_ground_still_allows_paired_real_3d_rays(self):
         node=self.fixture();node.next_clearing=0.
         key=next(iter(node.memory.cells));cell=node.memory.cells[key]
         node.memory.cells[key]=(*cell[:3],9.,7,*cell[5:])
         scan=PointCloud2();scan.header.stamp.sec=10
-        scan.fields=[PointField(name='positive_only',offset=12,
+        scan.fields=[PointField(name='unclassified',offset=12,
                                 datatype=PointField.UINT8,count=1)]
         cloud=PointCloud2();cloud.header.stamp.sec=10
         cloud.height=cloud.width=1;cloud.point_step=cloud.row_step=12

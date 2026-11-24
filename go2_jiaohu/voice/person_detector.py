@@ -3,6 +3,7 @@ import atexit
 import base64
 import json
 import logging
+import math
 import os
 from pathlib import Path
 import re
@@ -40,7 +41,10 @@ def select_person(boxes, side):
 
 
 class PersonDetector:
-    def __init__(self):
+    def __init__(self, confidence=.55):
+        if not math.isfinite(confidence) or not .25 <= confidence <= .90:
+            raise ValueError('人物检测阈值应在 0.25–0.90 之间')
+        self.confidence = confidence
         self._lock = threading.Lock()
         self._process = None
 
@@ -94,7 +98,8 @@ class PersonDetector:
         with self._lock:
             self._ensure()
             try:
-                self._process.stdin.write(json.dumps({'image': base64.b64encode(encoded).decode('ascii')})+'\n')
+                self._process.stdin.write(json.dumps({'image': base64.b64encode(encoded).decode('ascii'),
+                    'confidence': self.confidence})+'\n')
                 self._process.stdin.flush()
                 data = self._read(2.)
                 return data['boxes']

@@ -66,6 +66,15 @@ class DynamicEvidenceTests(unittest.TestCase):
                 self.observe(tracker,memory,person(y),10.+i*.2,pose=(0.,0.,i*.15 if turning else 0.))
             self.assertFalse(tracker.dynamic_cells)
 
+    def test_near_sparse_leg_is_tracked_after_real_lateral_motion(self):
+        tracker=DynamicObstacles();memory=ObstacleMemory()
+        for i in range(9):
+            points=np.array([[.65,-.5+i*.08+d,h]
+                for d in (-.06,0.,.06) for h in (.1,.3)])
+            self.observe(tracker,memory,points,10.+i*.1)
+        self.assertTrue(tracker.dynamic_cells)
+        self.assertGreaterEqual(tracker.confirmed_tracks,1)
+
     def test_a_thin_leg_never_gets_a_dynamic_lifetime(self):
         tracker=DynamicObstacles();memory=ObstacleMemory()
         for i in range(12):

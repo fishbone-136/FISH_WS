@@ -30,8 +30,9 @@ from nav_msgs.msg import OccupancyGrid, Odometry
 from rclpy.action import ActionClient
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, qos_profile_sensor_data
-from sensor_msgs.msg import LaserScan
-from std_msgs.msg import String
+from sensor_msgs.msg import LaserScan, PointCloud2
+from sensor_msgs_py.point_cloud2 import create_cloud_xyz32
+from std_msgs.msg import Header, String
 from tf2_ros import TransformBroadcaster
 from go2_navigation.safety_geometry import configured_protection
 import yaml
@@ -51,6 +52,9 @@ class World(Node):
         self.tf = TransformBroadcaster(self)
         self.odom = self.create_publisher(Odometry, '/odom', 1)
         self.scan = self.create_publisher(LaserScan, '/scan_safety', qos_profile_sensor_data)
+        self.raw_cloud = self.create_publisher(PointCloud2, '/livox/lidar', qos_profile_sensor_data)
+        self.memory = self.create_publisher(
+            PointCloud2, '/safety/remembered_obstacles', qos_profile_sensor_data)
         self.map = self.create_publisher(OccupancyGrid, '/test/fluency_map',
                                         QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL))
         self.create_subscription(Twist, '/cmd_vel_guarded', self.on_command, qos_profile_sensor_data)
@@ -81,7 +85,7 @@ class World(Node):
                                 for sign in (-1., 1.)])
         self.publish_map()
 
-    def publish_map(self):
+    def publish_map(self, block_robot=False):
         m = OccupancyGrid()
         m.header.frame_id = 'odom_lio'
         m.header.stamp = self.get_clock().now().to_msg()
@@ -93,6 +97,10 @@ class World(Node):
             ix, iy = int(math.floor((x + 2.) / .04)), int(math.floor((y + 3.) / .04))
             if 0 <= ix < 200 and 0 <= iy < 150:
                 grid[iy, ix] = 100
+        if block_robot:
+            # Make the current centre lethal in the planner without adding
+            # any return to the simulated physical scene.
+            grid[74:77, 49:52] = 100
         m.data = grid.ravel().tolist()
         self.map.publish(m)
 
@@ -115,8 +123,15 @@ class World(Node):
         odom.pose.pose.orientation = tf.transform.rotation
         odom.twist.twist = self.command
         self.odom.publish(odom)
-        if self.scan_enabled and now >= self.next_scan:
+        if now >= self.next_scan:
             self.next_scan = now + 1. / 15.
+            self.raw_cloud.publish(create_cloud_xyz32(
+                Header(stamp=stamp, frame_id='livox_frame'),
+                [(2., 0., 0.), (2., .05, .10), (2., -.05, -.10)]))
+            self.memory.publish(create_cloud_xyz32(
+                Header(stamp=stamp, frame_id='odom_lio'), []))
+            if not self.scan_enabled:
+                return
             scan = LaserScan()
             scan.header.frame_id, scan.header.stamp = 'base_link', stamp
             scan.angle_min, scan.angle_max = -math.pi, math.pi
@@ -189,6 +204,18 @@ def main():
                            'map_topic': '/test/fluency_map', 'map_subscribe_transient_local': True,
                            'subscribe_to_updates': False, 'track_unknown_space': False}
     config['controller_server']['ros__parameters']['FollowPath']['debug_trajectory_details'] = True
+    config['controller_server']['ros__parameters']['failure_tolerance'] = 2.5
+    front, rear, width = configured_protection()
+    config['controller_server']['ros__parameters']['FollowPath'].update({
+        'execution_safety.enabled': True,
+        'execution_safety.body_front': front,
+        'execution_safety.body_rear': rear,
+        'execution_safety.body_half_width': width,
+        'corridor_alignment': True,
+        # Keep the 72 cm cruise case outside the alignment classifier while
+        # exercising the narrower, physically impassable corridor below.
+        'corridor_max_width': .55,
+    })
     log_dir = root / 'reports' / ('navigation_fluency_' + time.strftime('%Y%m%d_%H%M%S'))
     log_dir.mkdir(parents=True, exist_ok=False)
     children, logs = [], []
@@ -246,6 +273,22 @@ def main():
             assert world.trajectory_diagnostics, 'Critic diagnostics not published'
             print('PASS 72 cm corridor: %d replans, no cruise stop/creep, %.2f s' %
                   (replans, time.monotonic() - start), flush=True)
+
+            if point_planning:
+                world.corridor(1.0, yaw=1.80)
+                world.publish_map(block_robot=True)
+                world.wait(.4)
+                result = world.follow(target=2.30)
+                world.wait(1.40)
+                assert not result.done() and abs(world.yaw - 1.80) < .01
+                first_mode = len(world.modes)
+                world.publish_map()
+                world.until(lambda: world.command.angular.z < -.14, 2.)
+                assert any(m['mode'] == 'path_align' and m['command'][1] < 0.
+                           for m in world.modes[first_mode:]), world.modes[first_mode:]
+                world.until(result.done, 20.)
+                assert result.result().status == 4
+                print('PASS preferred turn starts after a temporarily blocked alignment', flush=True)
 
             if point_planning:
                 for width in (1.0, .60, .50):

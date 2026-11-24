@@ -1,4 +1,4 @@
-"""面向中英文连续语音的本地 faster-whisper 进程桥。"""
+"""本地 ASR 进程桥：默认调用 yuyin 的隔离 Qwen 环境。"""
 
 from __future__ import annotations
 
@@ -33,29 +33,37 @@ class LocalWhisperASR:
     def ready(self) -> bool:
         return self._process is not None and self._process.poll() is None
 
+    def _worker_command(self) -> list[str]:
+        return [sys.executable, "-u", "-m", "voice.asr_worker"]
+
+    def _worker_environment(self) -> dict:
+        return os.environ.copy()
+
     def start(self) -> None:
         if self.ready:
             return
         project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        self._process = subprocess.Popen(
-            [sys.executable, "-u", "-m", "voice.asr_worker"],
-            cwd=project_dir,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=None,
-            bufsize=0,
-        )
-        self._read_buffer = b""
         try:
+            self._process = subprocess.Popen(
+                self._worker_command(),
+                cwd=project_dir,
+                env=self._worker_environment(),
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=None,
+                bufsize=0,
+            )
+            self._read_buffer = b""
             response = self._read_response(self.startup_timeout)
-        except Exception:
+        except Exception as exc:
             self.close(force=True)
-            raise
+            raise LocalAsrError(f"ASR 子进程启动失败: {exc}") from exc
         if response.get("status") != "ready":
             error = response.get("error", "ASR 子进程启动失败")
             self.close(force=True)
             raise LocalAsrError(str(error))
         self.runtime = (
+            f"{response.get('backend', 'faster-whisper')} / "
             f"{response.get('model')} / {response.get('device')} / "
             f"{response.get('compute_type')}"
         )
@@ -157,3 +165,49 @@ class LocalWhisperASR:
 
     def __del__(self):
         self.close(force=True)
+
+
+class LocalQwenASR(LocalWhisperASR):
+    """使用独立 Python 和 CUDA 库，只向 UI 返回识别结果。"""
+
+    def _worker_command(self) -> list[str]:
+        from . import config
+
+        if not os.path.isfile(config.QWEN_ASR_PYTHON) or not os.access(config.QWEN_ASR_PYTHON, os.X_OK):
+            raise LocalAsrError(f"未找到 Qwen 独立解释器: {config.QWEN_ASR_PYTHON}")
+        worker = os.path.join(os.path.dirname(os.path.abspath(__file__)), "qwen_asr_worker.py")
+        return [
+            config.QWEN_ASR_PYTHON, "-I", "-B", "-u", worker,
+            "--qwen-root", config.QWEN_ASR_ROOT,
+            "--model-dir", config.QWEN_ASR_MODEL,
+            "--device", config.QWEN_ASR_DEVICE,
+            "--language", config.QWEN_ASR_LANGUAGE,
+        ]
+
+    def _worker_environment(self) -> dict:
+        from . import config
+
+        env = super()._worker_environment()
+        # -I 忽略 Python 路径变量；同时移除它们，避免传给其他子进程。
+        env.pop("PYTHONPATH", None)
+        env.pop("PYTHONHOME", None)
+        private_libraries = os.path.join(config.QWEN_ASR_ROOT, ".cuda-libs")
+        if os.path.isdir(private_libraries):
+            env["LD_LIBRARY_PATH"] = os.pathsep.join(
+                [private_libraries] + ([env["LD_LIBRARY_PATH"]] if env.get("LD_LIBRARY_PATH") else [])
+            )
+        env["HF_HUB_OFFLINE"] = "1"
+        env["TRANSFORMERS_OFFLINE"] = "1"
+        env["TOKENIZERS_PARALLELISM"] = "false"
+        env["PYTHONDONTWRITEBYTECODE"] = "1"
+        return env
+
+
+def create_local_asr() -> LocalWhisperASR:
+    from . import config
+
+    if config.ASR_BACKEND == "qwen":
+        return LocalQwenASR()
+    if config.ASR_BACKEND == "whisper":
+        return LocalWhisperASR()
+    raise LocalAsrError(f"不支持的 GO2_ASR_BACKEND: {config.ASR_BACKEND}（可选 qwen、whisper）")

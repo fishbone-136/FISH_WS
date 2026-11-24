@@ -33,9 +33,12 @@ def main():
     qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
     maps = node.create_publisher(OccupancyGrid, '/safety/navigation_global', qos)
     health = node.create_publisher(Bool, '/lio/localization_valid', qos)
+    motion = node.create_publisher(Bool, '/go2/navigation_motion_enabled', qos)
+    safety = node.create_publisher(String, '/safety/motion_diagnostics', 1)
     faults = node.create_publisher(String, '/safety/navigation_fault', qos)
     tf = TransformBroadcaster(node)
-    state = {'id': 3, 'healthy': True, 'fresh_tf': True, 'requests': [], 'cancel': 0, 'zeros': 0}
+    state = {'id': 3, 'healthy': True, 'fresh_tf': True, 'zone_clear': False,
+             'requests': [], 'cancel': 0, 'zeros': 0}
 
     def manage(request, response):
         state['requests'].append(request.command)
@@ -74,6 +77,11 @@ def main():
         grid.header.stamp = node.get_clock().now().to_msg()
         maps.publish(grid)
         health.publish(Bool(data=state['healthy']))
+        motion.publish(Bool(data=True))
+        safety.publish(String(data=json.dumps(dict(
+            lidar_source='unitree', unitree_required=True, unitree_reason='none',
+            scan_valid=True, footprint_valid=True, memory_valid=True,
+            raw_lidar_valid=True, hard_zone_clear=state['zone_clear'], turn_clear=True))))
         transform = TransformStamped()
         stamp = node.get_clock().now()
         if not state['fresh_tf']:
@@ -85,9 +93,11 @@ def main():
         tf.sendTransform(transform)
     node.create_timer(.05, publish)
     worker = RosNavigationWorker()
-    statuses, results = [], []
+    statuses, results, capabilities, goals = [], [], [], []
     worker.status_updated.connect(lambda s, m: statuses.append((s, m)))
     worker.control_finished.connect(lambda *args: results.append(args))
+    worker.capabilities_updated.connect(capabilities.append)
+    worker.goal_finished.connect(lambda *args: goals.append(args))
     worker.start()
 
     def until(condition, timeout=7.):
@@ -101,6 +111,12 @@ def main():
 
     try:
         until(lambda: statuses and statuses[-1][0] == 'ready')
+        until(lambda: capabilities and capabilities[-1].get('lidar_source') == 'unitree' and
+              '保护区内有占用' in capabilities[-1].get('motion_safety_warning', ''))
+        worker.enqueue('goal', .5, .4, 0., True)
+        until(lambda: goals and goals[-1][0] is False and '保护区内有占用' in goals[-1][1])
+        state['zone_clear'] = True
+        until(lambda: capabilities[-1].get('motion_safety_warning') == '')
         worker.enqueue('pause')
         until(lambda: results and results[-1][:2] == ('pause', True))
         until(lambda: statuses[-1][0] == 'paused')
@@ -120,6 +136,7 @@ def main():
         assert len(state['requests']) == before, 'Faulted localization was resumed'
         report = {'pause_resume_acknowledged': True, 'cancel_and_zero_on_stop': True,
                   'stale_cached_tf_rejected': True, 'fault_resume_rejected': True,
+                  'unitree_occupied_footprint_goal_inhibited': True,
                   'lifecycle_requests': state['requests'], 'isolated_domain': 94}
         output = Path(os.environ['GO2_HUMBLE_PROJECT_ROOT']) / 'reports/ui_navigation_controls_ros_20261110.json'
         output.write_text(json.dumps(report, indent=2))

@@ -7,7 +7,7 @@ collision_monitor:
     cmd_vel_in_topic: /cmd_vel
     cmd_vel_out_topic: /cmd_vel_safe
     transform_tolerance: 0.2
-    source_timeout: 0.5
+    source_timeout: 0.25
     # /scan_safety is already in base_link. Humble's inter-time TF lookup
     # waits for a future LIO pose on every command and throttled this lane to
     # ~6 Hz. The final gate independently checks the actual scan age, measured
@@ -16,19 +16,18 @@ collision_monitor:
     stop_pub_timeout: 1.0
     polygons: [EmergencyStop, FootprintApproach]
     EmergencyStop:
-      # Physical body: +/-0.38 x +/-0.15 m; no extra padding.
+      # Protected body: +/-0.38 x +/-0.175 m.
       # The final gate checks the speed-dependent braking arc beyond it,
       # rather than blocking a safe away-turn with a larger fixed rectangle.
       type: polygon
-      points: [0.38, 0.15, 0.38, -0.15, -0.38, -0.15, -0.38, 0.15]
+      points: [0.38, 0.175, 0.38, -0.175, -0.38, -0.175, -0.38, 0.175]
       action_type: stop
       # Humble uses count > max_points for STOP: one chair-leg return stops.
       max_points: 0
       visualize: true
       polygon_pub_topic: /safety/stop_zone
-      # Point experiment: no polygon area. Launch derives both flags from
-      # physical_safety.collision_model and restores these in rectangle mode.
-      enabled: false
+      # The launch derives this flag from the physical execution model.
+      enabled: true
     FootprintApproach:
       type: polygon
       action_type: approach
@@ -41,7 +40,7 @@ collision_monitor:
       # The downstream turn gate separately checks every single future return.
       max_points: 1
       visualize: false
-      enabled: false
+      enabled: true
     observation_sources: [scan]
     scan:
       type: scan

@@ -35,6 +35,7 @@ class DepthWidget(QWidget):
         self._startup_error = ""
         self._startup_attempts = 0
         self._shutdown_requested = False
+        self._paused = False
         self._depth_scale_m = 0.001
         self._depth_frame_time = 0.0
         self._align = None
@@ -96,7 +97,7 @@ class DepthWidget(QWidget):
             self.depth_info.setText("请检查 RealSense SDK 安装环境")
 
     def _start_realsense(self):
-        if self._shutdown_requested:
+        if self._shutdown_requested or self._paused or (self._pipeline is not None and self._running):
             return
         self._startup_attempts += 1
         # 使用 SDK 回调模式：pipeline 的 start/stop 都在 Qt 主线程，帧由
@@ -289,6 +290,49 @@ class DepthWidget(QWidget):
             color, depth, wall_time, monotonic_time, intrinsics = sample
             return RgbdSnapshot(color.copy(), depth.copy(), wall_time, monotonic_time,
                 lambda u, v, z: rs.rs2_deproject_pixel_to_point(intrinsics, [u, v], z))
+
+    def _clear_frames(self):
+        with self._buf_lock:
+            self._rgbd_sample = None
+            self._buf_depth_bytes = self._buf_depth_raw = self._buf_color_bgr = None
+            self._depth_frame_time = self._color_frame_time = 0.
+            self._last_depth_number = self._last_color_number = None
+        self._depth_scaled = None
+        self.depth_label.clear()
+
+    def pause_capture(self):
+        """Release RGB before the exclusive wide-IR owner opens the same device."""
+        self._paused = True
+        self._display_timer.stop()
+        self._running = False
+        pipeline, self._pipeline = self._pipeline, None
+        if pipeline is not None:
+            pipeline.stop()
+        self._clear_frames()
+        self._startup_error = ''
+
+    def resume_capture(self):
+        if self._shutdown_requested:
+            return
+        self._paused = False
+        self._startup_attempts = 0
+        self._clear_frames()
+        self.depth_info.setText('正在恢复彩色/深度画面…')
+        self._start_realsense()
+
+    def show_external_snapshot(self, sample):
+        """Display the follow owner's native depth; never open a second pipeline."""
+        if not self._paused or sample is None:
+            return
+        depth = sample.depth_mm
+        h,w = depth.shape
+        with self._buf_lock:
+            self._buf_depth_raw = depth
+            self._buf_depth_bytes = self._depth_rgb_lut[depth].tobytes()
+            self._buf_depth_w,self._buf_depth_h = w,h
+            self._depth_frame_time = sample.captured_monotonic
+            self._frame_count += 1
+        self._display_latest_frame()
 
     def shutdown(self):
         self._shutdown_requested = True
